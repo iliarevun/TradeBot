@@ -1,3 +1,11 @@
+---
+title: TradeBot
+emoji: ⚡
+color: green
+sdk: docker
+pinned: false
+---
+
 # 🤖 TradeBot v2 — Telegram Trading Bot + Mini App
 
 ## 📦 Структура проекту
