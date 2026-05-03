@@ -10,8 +10,10 @@ from aiogram.types import (
 )
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 
+
 from config import BOT_TOKEN, WEBAPP_URL
 from analyzer import MarketAnalyzer
+from aiogram.client.default import DefaultBotProperties # Додай цей імпорт
 from messages import (
     WELCOME_MSG, HELP_MSG, LOADING_MSG,
     format_signal, format_scan_result
@@ -21,7 +23,8 @@ logging.basicConfig(level=logging.INFO,
     format="%(asctime)s - %(name)s - %(levelname)s - %(message)s")
 logger = logging.getLogger(__name__)
 
-bot      = Bot(token=BOT_TOKEN, parse_mode="HTML")
+# Виправлена ініціалізація:
+bot      = Bot(token=BOT_TOKEN, default=DefaultBotProperties(parse_mode="HTML"))
 dp       = Dispatcher(storage=MemoryStorage())
 analyzer = MarketAnalyzer()
 
