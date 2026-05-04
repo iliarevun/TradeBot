@@ -1,0 +1,915 @@
+<!DOCTYPE html>
+<html lang="uk">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<title>TradeBot v4</title>
+<script src="https://telegram.org/js/telegram-web-app.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/lightweight-charts@4.1.3/dist/lightweight-charts.standalone.production.js"></script>
+<style>
+*{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+:root{
+  --bg:#0a0e1a;--bg2:#111827;--bg3:#1a2235;--bg4:#1e2d45;
+  --accent:#3b82f6;--green:#22c55e;--red:#ef4444;--yellow:#f59e0b;
+  --purple:#8b5cf6;--orange:#f97316;--cyan:#06b6d4;
+  --text:#e2e8f0;--text2:#94a3b8;--text3:#64748b;
+  --border:#1e3a5f;--radius:12px;--radius-sm:8px;
+}
+html,body{height:100%;overflow:hidden;background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;font-size:14px}
+#app{display:flex;flex-direction:column;height:100dvh;overflow:hidden}
+#header{flex-shrink:0;background:var(--bg2);border-bottom:1px solid var(--border);padding:10px 16px;display:flex;align-items:center;justify-content:space-between}
+#content{flex:1;overflow-y:auto;overflow-x:hidden;padding:12px 12px 80px}
+#navbar{position:fixed;bottom:0;left:0;right:0;height:64px;background:var(--bg2);border-top:1px solid var(--border);display:flex;align-items:center;justify-content:space-around;z-index:100}
+.header-left{display:flex;align-items:center;gap:10px}
+.logo{width:32px;height:32px;background:linear-gradient(135deg,var(--accent),var(--purple));border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:16px}
+.header-title{font-size:15px;font-weight:700}
+.header-sub{font-size:11px;color:var(--text3)}
+.live-dot{width:8px;height:8px;background:var(--green);border-radius:50%;animation:pulse 2s infinite}
+@keyframes pulse{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.6;transform:scale(1.2)}}
+.nav-btn{display:flex;flex-direction:column;align-items:center;gap:3px;padding:8px 6px;cursor:pointer;border-radius:var(--radius-sm);color:var(--text3);border:none;background:none;flex:1}
+.nav-btn.active{color:var(--accent)}
+.nav-btn svg{width:20px;height:20px}
+.nav-btn span{font-size:10px;font-weight:500}
+.card{background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius);padding:14px;margin-bottom:10px}
+.card-title{font-size:12px;font-weight:600;color:var(--text2);text-transform:uppercase;letter-spacing:.5px;margin-bottom:10px}
+.section-title{font-size:16px;font-weight:700;margin-bottom:12px}
+/* Tabs */
+.tab-row{display:flex;gap:6px;margin-bottom:12px;overflow-x:auto;padding-bottom:4px}
+.tab-row::-webkit-scrollbar{display:none}
+.tab-btn{padding:6px 14px;border-radius:20px;border:1px solid var(--border);background:transparent;color:var(--text3);font-size:12px;font-weight:500;cursor:pointer;white-space:nowrap;transition:.2s}
+.tab-btn.active{background:var(--accent);border-color:var(--accent);color:#fff}
+/* Pairs Grid */
+.pairs-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px}
+.pair-btn{background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius-sm);padding:10px;cursor:pointer;transition:.2s}
+.pair-btn.active,.pair-btn:active{border-color:var(--accent);background:var(--bg4)}
+.pair-name{font-size:13px;font-weight:600}
+.pair-price{font-size:11px;color:var(--text3);margin-top:2px}
+/* TF buttons */
+.tf-row{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px}
+.tf-btn{padding:6px 12px;border-radius:6px;border:1px solid var(--border);background:var(--bg3);color:var(--text3);font-size:12px;font-weight:600;cursor:pointer;transition:.2s}
+.tf-btn.active{background:var(--accent);border-color:var(--accent);color:#fff}
+/* Chart */
+#chartWrap{width:100%;height:260px;border-radius:var(--radius);overflow:hidden;position:relative;background:var(--bg2)}
+#chart{width:100%;height:100%}
+.chart-overlay{position:absolute;top:8px;left:8px;z-index:10;display:flex;gap:6px;flex-wrap:wrap}
+.ind-badge-sm{background:rgba(0,0,0,.7);border:1px solid var(--border);border-radius:4px;padding:2px 7px;font-size:10px;font-weight:600}
+/* Signal */
+.signal-card{display:flex;align-items:center;gap:12px;padding:14px;background:var(--bg3);border-radius:var(--radius);border:1px solid var(--border);margin-bottom:10px}
+.sig-icon{width:50px;height:50px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:20px;flex-shrink:0}
+.sig-icon.buy{background:rgba(34,197,94,.15);border:2px solid var(--green)}
+.sig-icon.sell{background:rgba(239,68,68,.15);border:2px solid var(--red)}
+.sig-icon.neutral{background:rgba(100,116,139,.15);border:2px solid var(--text3)}
+.sig-dir{font-size:22px;font-weight:800}
+.sig-dir.buy{color:var(--green)}.sig-dir.sell{color:var(--red)}.sig-dir.neutral{color:var(--text3)}
+.sig-sub{font-size:11px;color:var(--text3);margin-top:2px}
+.prog-wrap{height:5px;background:var(--bg3);border-radius:3px;overflow:hidden;margin-top:5px}
+.prog-fill{height:100%;border-radius:3px;transition:width .6s}
+.prog-fill.buy{background:linear-gradient(90deg,var(--green),#16a34a)}
+.prog-fill.sell{background:linear-gradient(90deg,var(--red),#dc2626)}
+.prog-fill.neutral{background:var(--text3)}
+/* Levels Grid */
+.levels-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.level-item{background:var(--bg3);border-radius:var(--radius-sm);padding:10px}
+.level-label{font-size:10px;font-weight:600;color:var(--text3);text-transform:uppercase;margin-bottom:4px}
+.level-value{font-size:13px;font-weight:700;font-family:'Courier New',monospace}
+.lv-green{color:var(--green)}.lv-red{color:var(--red)}.lv-accent{color:var(--accent)}.lv-yellow{color:var(--yellow)}.lv-purple{color:var(--purple)}
+/* Indicator row */
+.ind-row{display:flex;justify-content:space-between;align-items:center;padding:7px 0;border-bottom:1px solid var(--border)}
+.ind-row:last-child{border-bottom:none}
+.ind-name{font-size:12px;color:var(--text2)}
+.ind-val{font-size:12px;font-weight:600}
+.badge{padding:3px 8px;border-radius:20px;font-size:10px;font-weight:600}
+.badge-bull{background:rgba(34,197,94,.15);color:var(--green)}
+.badge-bear{background:rgba(239,68,68,.15);color:var(--red)}
+.badge-neut{background:rgba(100,116,139,.15);color:var(--text3)}
+.badge-warn{background:rgba(245,158,11,.15);color:var(--yellow)}
+/* Strategy items */
+.strat-item{display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid var(--border)}
+.strat-item:last-child{border-bottom:none}
+.strat-rank{width:20px;height:20px;border-radius:50%;background:var(--bg3);display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:700;flex-shrink:0}
+.strat-name{font-size:12px;font-weight:600;flex:1}
+.strat-dir{font-size:10px;margin-top:1px}
+.strat-dir.buy{color:var(--green)}.strat-dir.sell{color:var(--red)}.strat-dir.neutral{color:var(--text3)}
+.mini-bar{width:50px;height:4px;background:var(--bg3);border-radius:2px;overflow:hidden}
+.mini-bar-fill{height:100%;border-radius:2px}
+.mini-bar-fill.buy{background:var(--green)}.mini-bar-fill.sell{background:var(--red)}.mini-bar-fill.neutral{background:var(--text3)}
+/* Probability */
+.prob-card{border-radius:var(--radius);padding:14px;margin-bottom:10px;border:1px solid}
+.prob-A{background:rgba(34,197,94,.08);border-color:rgba(34,197,94,.3)}
+.prob-B{background:rgba(59,130,246,.08);border-color:rgba(59,130,246,.3)}
+.prob-C{background:rgba(245,158,11,.08);border-color:rgba(245,158,11,.3)}
+.prob-D{background:rgba(239,68,68,.08);border-color:rgba(239,68,68,.3)}
+/* SMC */
+.smc-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.smc-item{background:var(--bg3);border-radius:var(--radius-sm);padding:10px;text-align:center}
+.smc-label{font-size:10px;color:var(--text3);margin-bottom:4px}
+.smc-val{font-size:13px;font-weight:700}
+/* Patterns */
+.pat-wrap{display:flex;flex-wrap:wrap;gap:6px}
+.pat-chip{padding:3px 9px;border-radius:20px;font-size:11px;font-weight:500;border:1px solid}
+.pat-bull{background:rgba(34,197,94,.1);border-color:rgba(34,197,94,.3);color:var(--green)}
+.pat-bear{background:rgba(239,68,68,.1);border-color:rgba(239,68,68,.3);color:var(--red)}
+.pat-neut{background:rgba(100,116,139,.1);border-color:rgba(100,116,139,.3);color:var(--text3)}
+/* Scan */
+.scan-item{display:flex;align-items:center;gap:10px;padding:10px;background:var(--bg3);border-radius:var(--radius-sm);border:1px solid var(--border);margin-bottom:8px;cursor:pointer}
+.scan-item:active{border-color:var(--accent)}
+.scan-sig{width:36px;height:36px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:800;flex-shrink:0}
+.scan-sig.buy{background:rgba(34,197,94,.15);color:var(--green)}
+.scan-sig.sell{background:rgba(239,68,68,.15);color:var(--red)}
+.scan-sig.neutral,.scan-sig.error{background:rgba(100,116,139,.15);color:var(--text3)}
+/* Journal */
+.entry-item{background:var(--bg3);border-radius:var(--radius-sm);border:1px solid var(--border);padding:12px;margin-bottom:8px}
+.entry-head{display:flex;justify-content:space-between;margin-bottom:6px}
+.entry-pair{font-size:13px;font-weight:700}
+.entry-res{font-size:13px;font-weight:700}
+.entry-res.win{color:var(--green)}.entry-res.loss{color:var(--red)}
+.entry-detail{font-size:11px;color:var(--text3);display:flex;gap:10px;flex-wrap:wrap}
+.entry-note{font-size:11px;color:var(--text2);margin-top:6px;font-style:italic}
+/* Stats */
+.stats-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:12px}
+.stat-card{background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius-sm);padding:12px;text-align:center}
+.stat-val{font-size:20px;font-weight:800;margin-bottom:2px}
+.stat-lbl{font-size:10px;color:var(--text3);text-transform:uppercase;letter-spacing:.5px}
+/* Calc */
+.calc-result{background:linear-gradient(135deg,rgba(59,130,246,.08),rgba(139,92,246,.08));border:1px solid rgba(59,130,246,.2);border-radius:var(--radius);padding:14px;margin-top:10px}
+.calc-row{display:flex;justify-content:space-between;padding:4px 0}
+.calc-lbl{font-size:12px;color:var(--text2)}
+.calc-val{font-size:13px;font-weight:700;color:var(--accent)}
+/* Learn */
+.learn-cat{background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius-sm);padding:14px;margin-bottom:8px;cursor:pointer;display:flex;align-items:center;justify-content:space-between}
+.learn-cat:active{border-color:var(--accent)}
+.learn-cat-title{font-size:14px;font-weight:600}
+.learn-topic{background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius-sm);padding:12px;margin-bottom:6px;cursor:pointer}
+.learn-topic:active{border-color:var(--accent)}
+.learn-topic-title{font-size:13px;font-weight:600}
+.learn-content{font-size:13px;line-height:1.6;color:var(--text2)}
+.learn-content b{color:var(--text)}
+.learn-img{width:100%;border-radius:var(--radius-sm);margin-bottom:12px;object-fit:cover;height:160px;background:var(--bg3)}
+/* Form */
+.form-group{display:flex;flex-direction:column;gap:4px;margin-bottom:10px}
+.form-lbl{font-size:11px;font-weight:600;color:var(--text3);text-transform:uppercase}
+.form-row{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.form-input,.form-select,.form-textarea{background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius-sm);padding:10px 12px;color:var(--text);font-size:13px;outline:none;-webkit-appearance:none;width:100%}
+.form-input:focus,.form-select:focus{border-color:var(--accent)}
+.form-textarea{resize:none;height:65px;font-family:inherit}
+.btn-primary{background:linear-gradient(135deg,var(--accent),var(--purple));border:none;border-radius:var(--radius-sm);color:#fff;padding:12px;font-size:14px;font-weight:700;cursor:pointer;width:100%;margin-top:4px}
+.btn-primary:active{opacity:.85}
+.btn-sm{background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius-sm);color:var(--text);padding:8px 14px;font-size:12px;font-weight:600;cursor:pointer}
+.btn-sm:active{border-color:var(--accent)}
+/* Loader */
+.loader{display:flex;flex-direction:column;align-items:center;justify-content:center;padding:40px;gap:12px}
+.spinner{width:36px;height:36px;border:3px solid var(--border);border-top-color:var(--accent);border-radius:50%;animation:spin .8s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+.loader-txt{font-size:12px;color:var(--text3);text-align:center}
+/* Toast */
+#toast{position:fixed;top:70px;left:50%;transform:translateX(-50%);background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius-sm);padding:10px 18px;font-size:13px;font-weight:500;z-index:999;opacity:0;transition:opacity .3s;pointer-events:none;white-space:nowrap}
+#toast.show{opacity:1}
+/* Empty */
+.empty{text-align:center;padding:40px 20px;color:var(--text3)}
+.empty-icon{font-size:36px;margin-bottom:10px}
+/* Warn box */
+.warn-box{background:rgba(245,158,11,.08);border:1px solid rgba(245,158,11,.3);border-radius:var(--radius-sm);padding:10px;margin-bottom:10px}
+.warn-title{color:var(--yellow);font-weight:700;font-size:13px;margin-bottom:4px}
+.warn-item{font-size:12px;color:var(--yellow);margin-top:3px}
+/* Factor */
+.factor-item{display:flex;align-items:center;gap:8px;padding:4px 0;font-size:12px;color:var(--text2)}
+/* Util */
+.hidden{display:none!important}
+.flex{display:flex}.gap-8{gap:8px}.mt-8{margin-top:8px}.mb-4{margin-bottom:4px}
+.text-green{color:var(--green)}.text-red{color:var(--red)}.text-yellow{color:var(--yellow)}
+.text-accent{color:var(--accent)}.text-muted{color:var(--text3)}.text-purple{color:var(--purple)}
+.bold{font-weight:700}.small{font-size:11px}
+::-webkit-scrollbar{width:3px}::-webkit-scrollbar-thumb{background:var(--border);border-radius:2px}
+</style>
+</head>
+<body>
+<div id="app">
+  <div id="header">
+    <div class="header-left">
+      <div class="logo">📈</div>
+      <div><div class="header-title">TradeBot v4</div><div class="header-sub" id="headerSub">Professional Analysis</div></div>
+    </div>
+    <div class="live-dot"></div>
+  </div>
+
+  <div id="content">
+    <!-- ANALYSIS -->
+    <div id="page-analysis">
+      <div class="tab-row" id="catTabs">
+        <button class="tab-btn active" onclick="setCategory('forex')">💱 Forex</button>
+        <button class="tab-btn" onclick="setCategory('crypto')">₿ Крипто</button>
+        <button class="tab-btn" onclick="setCategory('indices')">📊 Індекси</button>
+        <button class="tab-btn" onclick="setCategory('commodities')">🥇 Товари</button>
+      </div>
+      <div class="pairs-grid" id="pairsGrid"></div>
+      <div class="tf-row" id="tfRow">
+        <button class="tf-btn" onclick="setTF('5m')">M5</button>
+        <button class="tf-btn" onclick="setTF('15m')">M15</button>
+        <button class="tf-btn" onclick="setTF('30m')">M30</button>
+        <button class="tf-btn active" onclick="setTF('1h')">H1</button>
+        <button class="tf-btn" onclick="setTF('4h')">H4</button>
+        <button class="tf-btn" onclick="setTF('1d')">D1</button>
+        <button class="tf-btn" onclick="setTF('1wk')">W1</button>
+      </div>
+      <div class="card" style="padding:0;overflow:hidden;margin-bottom:10px">
+        <div id="chartWrap"><div id="chart"></div><div class="chart-overlay" id="chartOverlay"></div></div>
+      </div>
+      <button class="btn-primary" id="analyzeBtn" onclick="runAnalysis()">🔍 Повний аналіз v4</button>
+      <div id="analysisResults"></div>
+    </div>
+
+    <!-- SCAN -->
+    <div id="page-scan" class="hidden">
+      <div class="section-title">🔍 Авто-скан ринку</div>
+      <div class="tab-row" id="scanCatTabs">
+        <button class="tab-btn active" onclick="setScanCat('forex')">💱 Forex</button>
+        <button class="tab-btn" onclick="setScanCat('crypto')">₿ Крипто</button>
+        <button class="tab-btn" onclick="setScanCat('all')">🌐 Всі</button>
+      </div>
+      <button class="btn-primary mb-4" onclick="runScan()">🚀 Запустити скан</button>
+      <div id="scanResults"></div>
+    </div>
+
+    <!-- JOURNAL -->
+    <div id="page-journal" class="hidden">
+      <div class="section-title">📓 Торговий журнал</div>
+      <div class="stats-grid" id="jStats">
+        <div class="stat-card"><div class="stat-val text-green" id="sWR">0%</div><div class="stat-lbl">Win Rate</div></div>
+        <div class="stat-card"><div class="stat-val text-accent" id="sTrades">0</div><div class="stat-lbl">Угод</div></div>
+        <div class="stat-card"><div class="stat-val" id="sPL">$0</div><div class="stat-lbl">P&L</div></div>
+        <div class="stat-card"><div class="stat-val text-yellow" id="sRR">1:0</div><div class="stat-lbl">Сер. RR</div></div>
+      </div>
+      <div class="card">
+        <div class="card-title">➕ Записати угоду</div>
+        <div class="form-row">
+          <div class="form-group"><label class="form-lbl">Пара</label><input class="form-input" id="jPair" placeholder="EUR/USD"></div>
+          <div class="form-group"><label class="form-lbl">Напрямок</label><select class="form-select" id="jDir"><option value="BUY">🟢 BUY (Лонг)</option><option value="SELL">🔴 SELL (Шорт)</option></select></div>
+        </div>
+        <div class="form-row">
+          <div class="form-group"><label class="form-lbl">Вхід</label><input class="form-input" id="jEntry" type="number" step="0.00001" placeholder="1.09500"></div>
+          <div class="form-group"><label class="form-lbl">Stop Loss</label><input class="form-input" id="jSL" type="number" step="0.00001" placeholder="1.09200"></div>
+        </div>
+        <div class="form-row">
+          <div class="form-group"><label class="form-lbl">Результат ($)</label><input class="form-input" id="jResult" type="number" step="0.01" placeholder="+1.50"></div>
+          <div class="form-group"><label class="form-lbl">RR фактичний</label><input class="form-input" id="jRR" type="number" step="0.1" placeholder="2.1"></div>
+        </div>
+        <div class="form-group"><label class="form-lbl">Стратегія</label>
+          <select class="form-select" id="jStrat">
+            <option>1. Відбій від рівня</option><option>2. Пробій + ретест</option>
+            <option>3. Тренд + корекція</option><option>4. Діапазон</option>
+            <option>5. EMA Crossover</option><option>SMC / Ліквідність</option>
+          </select>
+        </div>
+        <div class="form-group"><label class="form-lbl">Нотатка (що зроблено правильно / помилки)</label><textarea class="form-textarea" id="jNote" placeholder="Пін-бар від рівня 1.0900, тренд D1 вгору..."></textarea></div>
+        <button class="btn-primary" onclick="addJournalEntry()">💾 Зберегти угоду</button>
+      </div>
+      <div class="card mt-8">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
+          <div class="card-title" style="margin:0">Останні угоди</div>
+          <button class="btn-sm" onclick="clearJournal()">Очистити</button>
+        </div>
+        <div id="journalEntries"></div>
+      </div>
+    </div>
+
+    <!-- CALC -->
+    <div id="page-calc" class="hidden">
+      <div class="section-title">📐 Risk Management</div>
+      <div class="card">
+        <div class="card-title">Калькулятор позиції</div>
+        <div class="form-row">
+          <div class="form-group"><label class="form-lbl">Депозит ($)</label><input class="form-input" id="cDep" type="number" value="50" oninput="calcR()"></div>
+          <div class="form-group"><label class="form-lbl">Ризик (%)</label><input class="form-input" id="cRisk" type="number" value="2" step="0.1" oninput="calcR()"></div>
+        </div>
+        <div class="form-row">
+          <div class="form-group"><label class="form-lbl">Ціна входу</label><input class="form-input" id="cEntry" type="number" step="0.00001" placeholder="1.09500" oninput="calcR()"></div>
+          <div class="form-group"><label class="form-lbl">Stop Loss</label><input class="form-input" id="cSL" type="number" step="0.00001" placeholder="1.09200" oninput="calcR()"></div>
+        </div>
+        <div class="form-row">
+          <div class="form-group"><label class="form-lbl">Take Profit</label><input class="form-input" id="cTP" type="number" step="0.00001" placeholder="1.10100" oninput="calcR()"></div>
+          <div class="form-group"><label class="form-lbl">Вартість пункту ($)</label><input class="form-input" id="cPipV" type="number" value="0.1" step="0.01" oninput="calcR()"></div>
+        </div>
+        <div class="calc-result">
+          <div class="calc-row"><span class="calc-lbl">💰 Ризик у $</span><span class="calc-val" id="rRisk">—</span></div>
+          <div class="calc-row"><span class="calc-lbl">📦 Розмір лоту</span><span class="calc-val" id="rLot">—</span></div>
+          <div class="calc-row"><span class="calc-lbl">🛑 SL (пунктів)</span><span class="calc-val" id="rSLPips">—</span></div>
+          <div class="calc-row"><span class="calc-lbl">🎯 TP (пунктів)</span><span class="calc-val" id="rTPPips">—</span></div>
+          <div class="calc-row"><span class="calc-lbl">⚖️ Risk:Reward</span><span class="calc-val" id="rRR2">—</span></div>
+          <div class="calc-row"><span class="calc-lbl">💵 Потенційний прибуток</span><span class="calc-val text-green" id="rProfit">—</span></div>
+          <div class="calc-row"><span class="calc-lbl">⚠️ Макс. збиток/день (5%)</span><span class="calc-val text-red" id="rMaxL">—</span></div>
+        </div>
+      </div>
+      <div class="card mt-8">
+        <div class="card-title">📋 Таблиця ризику</div>
+        <div id="riskTable"></div>
+      </div>
+    </div>
+
+    <!-- LEARN -->
+    <div id="page-learn" class="hidden">
+      <div class="section-title">🎓 Навчання</div>
+      <div id="learnHome"></div>
+      <div id="learnCat" class="hidden"></div>
+      <div id="learnTopic" class="hidden"></div>
+    </div>
+  </div>
+
+  <nav id="navbar">
+    <button class="nav-btn active" id="nav-analysis" onclick="showPage('analysis')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg><span>Аналіз</span>
+    </button>
+    <button class="nav-btn" id="nav-scan" onclick="showPage('scan')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg><span>Скан</span>
+    </button>
+    <button class="nav-btn" id="nav-journal" onclick="showPage('journal')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg><span>Журнал</span>
+    </button>
+    <button class="nav-btn" id="nav-calc" onclick="showPage('calc')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="4" y="2" width="16" height="20" rx="2"/><line x1="8" y1="6" x2="16" y2="6"/><line x1="8" y1="10" x2="16" y2="10"/></svg><span>Калькулятор</span>
+    </button>
+    <button class="nav-btn" id="nav-learn" onclick="showPage('learn')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/></svg><span>Навчання</span>
+    </button>
+  </nav>
+</div>
+<div id="toast"></div>
+
+<script>
+// ═══════════════════════════════════════════════════════════
+//  CONFIG
+// ═══════════════════════════════════════════════════════════
+const TD_KEY = '2ae21e0394c14b51a2eda20530184f66';
+const TD_SYM = {'EURUSD=X':'EUR/USD','GBPUSD=X':'GBP/USD','USDJPY=X':'USD/JPY','USDCHF=X':'USD/CHF','AUDUSD=X':'AUD/USD','NZDUSD=X':'NZD/USD','USDCAD=X':'USD/CAD','EURGBP=X':'EUR/GBP','BTC-USD':'BTC/USD','ETH-USD':'ETH/USD','BNB-USD':'BNB/USD','SOL-USD':'SOL/USD','XRP-USD':'XRP/USD','ADA-USD':'ADA/USD','GC=F':'XAU/USD','CL=F':'WTI/USD','SI=F':'XAG/USD','^GSPC':'SPX','^IXIC':'IXIC','^GDAXI':'DAX','^FTSE':'FTSE'};
+const TD_TF  = {'5m':'5min','15m':'15min','30m':'30min','1h':'1h','4h':'4h','1d':'1day','1wk':'1week'};
+const CTX_TF = {'5m':'1h','15m':'4h','30m':'4h','1h':'1d','4h':'1d','1d':'1wk','1wk':'1wk'};
+const CTX2_TF= {'5m':'4h','15m':'1d','30m':'1d','1h':'1wk','4h':'1wk','1d':'1wk','1wk':'1wk'};
+
+const tg = window.Telegram?.WebApp;
+if(tg){tg.ready();tg.expand();tg.setHeaderColor('#0a0e1a');tg.setBackgroundColor('#0a0e1a');}
+
+// Rate limiting
+let _tdCalls=[], _tdLock=false;
+async function tdRateLimit(){
+  const now=Date.now();
+  _tdCalls=_tdCalls.filter(t=>now-t<60000);
+  if(_tdCalls.length>=7){
+    const wait=61000-(now-_tdCalls[0]);
+    if(wait>0){showToast(`⏳ Rate limit: чекаємо ${Math.ceil(wait/1000)}с...`);await sleep(wait);}
+    _tdCalls=[];
+  }
+  _tdCalls.push(Date.now());
+}
+
+const sleep=ms=>new Promise(r=>setTimeout(r,ms));
+
+// State
+const S={category:'forex',pair:'EURUSD=X',tf:'1h',scanCat:'forex',chart:null,
+          journal:JSON.parse(localStorage.getItem('tbJournal')||'[]'),
+          cache:{},lastResult:null,learnStack:[]};
+
+const PAIRS={
+  forex:[{l:'EUR/USD 🇪🇺',s:'EURUSD=X'},{l:'GBP/USD 🇬🇧',s:'GBPUSD=X'},{l:'USD/JPY 🇯🇵',s:'USDJPY=X'},{l:'USD/CHF 🇨🇭',s:'USDCHF=X'},{l:'AUD/USD 🇦🇺',s:'AUDUSD=X'},{l:'NZD/USD 🇳🇿',s:'NZDUSD=X'},{l:'USD/CAD 🇨🇦',s:'USDCAD=X'},{l:'EUR/GBP 🌍',s:'EURGBP=X'}],
+  crypto:[{l:'BTC/USD ₿',s:'BTC-USD'},{l:'ETH/USD Ξ',s:'ETH-USD'},{l:'BNB/USD',s:'BNB-USD'},{l:'SOL/USD',s:'SOL-USD'},{l:'XRP/USD',s:'XRP-USD'},{l:'ADA/USD',s:'ADA-USD'}],
+  indices:[{l:'S&P 500',s:'^GSPC'},{l:'NASDAQ',s:'^IXIC'},{l:'DAX',s:'^GDAXI'},{l:'FTSE 100',s:'^FTSE'}],
+  commodities:[{l:'Золото XAU',s:'GC=F'},{l:'Нафта WTI',s:'CL=F'},{l:'Срібло',s:'SI=F'}],
+};
+const SCAN_PAIRS={
+  forex:['EURUSD=X','GBPUSD=X','USDJPY=X','AUDUSD=X','USDCHF=X','USDCAD=X'],
+  crypto:['BTC-USD','ETH-USD','BNB-USD','SOL-USD'],
+  all:['EURUSD=X','GBPUSD=X','USDJPY=X','BTC-USD','ETH-USD','GC=F','^GSPC'],
+};
+
+const PAT_LABELS={'bullish_pinbar':'Бичачий пін-бар 📍','bearish_pinbar':'Ведмежий пін-бар 📍','bullish_engulfing':'Бичаче поглинання 🟢','bearish_engulfing':'Ведмеже поглинання 🔴','doji':'Доджі ➕','inside_bar':'Inside Bar 📦','morning_star':'Ранкова зірка ⭐','evening_star':'Вечірня зірка ⭐','hammer':'Молот 🔨','shooting_star':'Падаюча зірка 💫','three_white':'3 білих солдати 🟢','three_black':'3 чорних ворони 🔴','tweezer_bottom':'Пінцет знизу 🔧','tweezer_top':'Пінцет зверху 🔧'};
+
+// ═══════════════════════════════════════════════════════════
+//  DATA
+// ═══════════════════════════════════════════════════════════
+async function fetchOHLCV(sym,tf,n=100){
+  const k=`${sym}_${tf}`,ttl=['5m','15m','30m'].includes(tf)?300000:1800000;
+  if(S.cache[k]&&Date.now()-S.cache[k].ts<ttl)return S.cache[k].d;
+  await tdRateLimit();
+  const tdSym=TD_SYM[sym]||sym,interval=TD_TF[tf]||'1h';
+  const url=`https://api.twelvedata.com/time_series?symbol=${encodeURIComponent(tdSym)}&interval=${interval}&outputsize=${n}&apikey=${TD_KEY}&format=JSON`;
+  const r=await fetch(url);const j=await r.json();
+  if(!j.values||j.status==='error')throw new Error(j.message||'API error');
+  const candles=j.values.reverse().map(v=>({time:Math.floor(new Date(v.datetime).getTime()/1000),open:+v.open,high:+v.high,low:+v.low,close:+v.close,volume:+(v.volume||0)}));
+  S.cache[k]={d:candles,ts:Date.now()};return candles;
+}
+
+// ═══════════════════════════════════════════════════════════
+//  INDICATORS (identical to Python)
+// ═══════════════════════════════════════════════════════════
+function ema(vals,n){const k=2/(n+1);let e=vals[0];return vals.map(v=>{e=v*k+e*(1-k);return e;});}
+function rsi(closes,n=14){const r=new Array(closes.length).fill(50);let ag=0,al=0;for(let i=1;i<=n;i++){const d=closes[i]-closes[i-1];if(d>0)ag+=d;else al-=d;}ag/=n;al/=n;r[n]=al===0?100:100-(100/(1+ag/al));for(let i=n+1;i<closes.length;i++){const d=closes[i]-closes[i-1];const g=d>0?d:0,l=d<0?-d:0;ag=(ag*(n-1)+g)/n;al=(al*(n-1)+l)/n;r[i]=al===0?100:100-(100/(1+ag/al));}return r;}
+function atr(cs,n=14){const t=new Array(cs.length).fill(0);for(let i=1;i<cs.length;i++){const hl=cs[i].high-cs[i].low,hc=Math.abs(cs[i].high-cs[i-1].close),lc=Math.abs(cs[i].low-cs[i-1].close);t[i]=Math.max(hl,hc,lc);}const a=[...t];for(let i=n;i<cs.length;i++){let s=0;for(let j=i-n+1;j<=i;j++)s+=t[j];a[i]=s/n;}return a;}
+function macd(closes){const f=ema(closes,12),sl=ema(closes,26),m=f.map((v,i)=>v-sl[i]),sig=ema(m,9);return{hist:m.map((v,i)=>v-sig[i])};}
+function adxCalc(cs,n=14){const sz=cs.length,pdm=new Array(sz).fill(0),mdm=new Array(sz).fill(0),tr=new Array(sz).fill(0);for(let i=1;i<sz;i++){const up=cs[i].high-cs[i-1].high,dn=cs[i-1].low-cs[i].low;pdm[i]=up>dn&&up>0?up:0;mdm[i]=dn>up&&dn>0?dn:0;tr[i]=Math.max(cs[i].high-cs[i].low,Math.abs(cs[i].high-cs[i-1].close),Math.abs(cs[i].low-cs[i-1].close));}function w(a,p){const r=new Array(a.length).fill(0);if(p<a.length)r[p]=a.slice(1,p+1).reduce((s,v)=>s+v,0)/p;for(let i=p+1;i<a.length;i++)r[i]=(r[i-1]*(p-1)+a[i])/p;return r;}const aw=w(tr,n),pw=w(pdm,n),mw=w(mdm,n);let pdi=0,mdi=0;const last=aw[aw.length-1]||1;pdi=100*pw[pw.length-1]/last;mdi=100*mw[mw.length-1]/last;const dx=[];for(let i=0;i<aw.length;i++){const t=aw[i]||1,p=100*pw[i]/t,m=100*mw[i]/t;dx.push(Math.abs(p-m)/((p+m)||1)*100);}const adxArr=w(dx,n);return{adx:adxArr[adxArr.length-1]||0,plusDI:pdi,minusDI:mdi,strong:adxArr[adxArr.length-1]>=25,direction:pdi>mdi?'bullish':'bearish'};}
+function stochRsi(closes,n=14){const rsiArr=rsi(closes,n);const mn=a=>Math.min(...a),mx=a=>Math.max(...a);return rsiArr.map((v,i)=>{if(i<n)return 50;const seg=rsiArr.slice(i-n,i+1);const min=mn(seg),max=mx(seg);return max===min?50:(v-min)/(max-min)*100;});}
+function williams(cs,n=14){return cs.map((c,i)=>{if(i<n)return -50;const seg=cs.slice(i-n,i+1);const h=Math.max(...seg.map(x=>x.high)),l=Math.min(...seg.map(x=>x.low));return (h-c.close)/(h-l||1)*-100;});}
+function cci(cs,n=20){return cs.map((c,i)=>{if(i<n)return 0;const seg=cs.slice(i-n,i+1);const tp=seg.map(x=>(x.high+x.low+x.close)/3),ma=tp.reduce((a,b)=>a+b,0)/n,md=tp.reduce((a,v)=>a+Math.abs(v-ma),0)/n;return md===0?0:((c.high+c.low+c.close)/3-ma)/(0.015*md);});}
+function vwap(cs){const sv=cs.reduce((s,c)=>s+c.volume,0);if(!sv)return null;const stp=cs.reduce((s,c)=>s+(c.high+c.low+c.close)/3*c.volume,0);return stp/sv;}
+function volumeProfile(cs,bins=20){const sv=cs.reduce((a,c)=>a+c.volume,0);if(!sv)return{poc:null,vah:null,val:null,above_poc:null,in_value:false};const mn=Math.min(...cs.map(c=>c.low)),mx=Math.max(...cs.map(c=>c.high));if(mx<=mn)return{poc:null,vah:null,val:null,above_poc:null,in_value:false};const bs=(mx-mn)/bins,vp=new Array(bins).fill(0);for(const c of cs){if(!c.volume)continue;const bl=Math.max(0,Math.floor((c.low-mn)/bs)),bh=Math.min(bins-1,Math.floor((c.high-mn)/bs));for(let b=bl;b<=bh;b++)vp[b]+=c.volume/(bh-bl+1);}const poc_b=vp.indexOf(Math.max(...vp));const poc=mn+(poc_b+0.5)*bs;const tot=vp.reduce((a,b)=>a+b,0),target=tot*0.7;let vl=poc_b,vh=poc_b,acc=vp[poc_b];while(acc<target){const el=vl>0,eh=vh<bins-1;if(!el&&!eh)break;const al=el?vp[vl-1]:0,ah=eh?vp[vh+1]:0;if(ah>=al&&eh){vh++;acc+=ah;}else if(el){vl--;acc+=al;}else{vh++;acc+=ah;}}const last=cs[cs.length-1].close;return{poc,vah:mn+(vh+1)*bs,val:mn+vl*bs,above_poc:last>poc,in_value:last>=mn+vl*bs&&last<=mn+(vh+1)*bs};}
+
+function findLevels(cs,win=8){const h=cs.map(c=>c.high),l=cs.map(c=>c.low),close=cs[cs.length-1].close;const sups=[],ress=[];for(let i=win;i<cs.length-win;i++){if(h[i]===Math.max(...h.slice(i-win,i+win+1)))ress.push(h[i]);if(l[i]===Math.min(...l.slice(i-win,i+win+1)))sups.push(l[i]);}function cluster(arr,tol=0.0015){if(!arr.length)return[];arr.sort((a,b)=>a-b);const r=[{price:arr[0],touches:1}];for(const v of arr.slice(1)){const ref=r[r.length-1].price;if(ref<1e-10||(v-ref)/ref>tol)r.push({price:v,touches:1});else{r[r.length-1].price=(ref+v)/2;r[r.length-1].touches++;}}return r;}const sc=cluster(sups),rc=cluster(ress);const ns=sc.filter(s=>s.price<close).sort((a,b)=>b.price-a.price)[0];const nr=rc.filter(r=>r.price>close).sort((a,b)=>a.price-b.price)[0];const fib={};if(ns&&nr&&nr.price>ns.price){const d=nr.price-ns.price;for(const[ra,lb]of[[.236,'23.6%'],[.382,'38.2%'],[.5,'50.0%'],[.618,'61.8%'],[.786,'78.6%']])fib[lb]=ns.price+d*ra;}const ns2=sc.filter(s=>s.price<(ns?.price||0)).sort((a,b)=>b.price-a.price)[0];const nr2=rc.filter(r=>r.price>(nr?.price||Infinity)).sort((a,b)=>a.price-b.price)[0];return{nearest_support:ns?.price||null,nearest_resistance:nr?.price||null,support_strength:ns?.touches||0,resistance_strength:nr?.touches||0,support2:ns2?.price||null,resistance2:nr2?.price||null,fib_levels:fib};}
+
+function detectPatterns(cs){const found=[];if(cs.length<3)return found;const n=cs.length-1;const c=cs;function body(i){return Math.abs(c[i].close-c[i].open);}function rng(i){return c[i].high-c[i].low;}function up(i){return c[i].high-Math.max(c[i].open,c[i].close);}function dn(i){return Math.min(c[i].open,c[i].close)-c[i].low;}function bull(i){return c[i].close>c[i].open;}function bear(i){return c[i].close<c[i].open;}if(rng(n)<1e-10)return found;if(dn(n)>=0.6*rng(n)&&body(n)<=0.35*rng(n))found.push('bullish_pinbar');if(up(n)>=0.6*rng(n)&&body(n)<=0.35*rng(n))found.push('bearish_pinbar');if(body(n)>0&&dn(n)>=2*body(n)&&up(n)<=0.15*rng(n))found.push('hammer');if(body(n)>0&&up(n)>=2*body(n)&&dn(n)<=0.15*rng(n))found.push('shooting_star');if(n>=1&&bear(n-1)&&bull(n)&&c[n].open<=c[n-1].close&&c[n].close>=c[n-1].open&&body(n)>body(n-1)*1.05)found.push('bullish_engulfing');if(n>=1&&bull(n-1)&&bear(n)&&c[n].open>=c[n-1].close&&c[n].close<=c[n-1].open&&body(n)>body(n-1)*1.05)found.push('bearish_engulfing');if(body(n)<=0.07*rng(n))found.push('doji');if(n>=1&&c[n].high<=c[n-1].high&&c[n].low>=c[n-1].low)found.push('inside_bar');if(n>=2&&bear(n-2)&&body(n-2)>0.5*rng(n-2)&&body(n-1)<0.3*rng(n-1)&&bull(n)&&c[n].close>(c[n-2].open+c[n-2].close)/2)found.push('morning_star');if(n>=2&&bull(n-2)&&body(n-2)>0.5*rng(n-2)&&body(n-1)<0.3*rng(n-1)&&bear(n)&&c[n].close<(c[n-2].open+c[n-2].close)/2)found.push('evening_star');if(n>=2&&[0,1,2].every(i=>bull(n-i))&&c[n].close>c[n-1].close&&c[n-1].close>c[n-2].close)found.push('three_white');if(n>=2&&[0,1,2].every(i=>bear(n-i))&&c[n].close<c[n-1].close&&c[n-1].close<c[n-2].close)found.push('three_black');if(n>=1&&bear(n-1)&&bull(n)&&Math.abs(c[n].low-c[n-1].low)/Math.max(rng(n),1e-10)<0.05)found.push('tweezer_bottom');if(n>=1&&bull(n-1)&&bear(n)&&Math.abs(c[n].high-c[n-1].high)/Math.max(rng(n),1e-10)<0.05)found.push('tweezer_top');return found;}
+
+function detectTrend(cs){const closes=cs.map(c=>c.close);const e21=ema(closes,21),e50=ema(closes,50),e200=ema(closes,200);const lc=closes[closes.length-1],l21=e21[e21.length-1],l50=e50[e50.length-1],l200=e200[e200.length-1],p21=e21[e21.length-2],p50=e50[e50.length-2];let dir,str;if(l21>l50&&l50>l200&&lc>l21){dir='bullish';str='strong';}else if(l21>l50&&lc>l50){dir='bullish';str='moderate';}else if(l21<l50&&l50<l200&&lc<l21){dir='bearish';str='strong';}else if(l21<l50&&lc<l50){dir='bearish';str='moderate';}else{dir='sideways';str='weak';}let cross='none';if(p21<=p50&&l21>l50)cross='bullish_cross';else if(p21>=p50&&l21<l50)cross='bearish_cross';const slope=(l21-(e21[e21.length-5]||l21))/Math.max(e21[e21.length-5]||l21,1e-10)*100;return{direction:dir,strength:str,ema21:l21,ema50:l50,ema200:l200,crossover:cross,slope_pct:slope};}
+
+function detectSMC(cs){const h=cs.map(c=>c.high),l=cs.map(c=>c.low),n=cs.length;const sh=[],sl_arr=[];for(let i=3;i<n-3;i++){if(h[i]===Math.max(...h.slice(i-3,i+4)))sh.push({i,v:h[i]});if(l[i]===Math.min(...l.slice(i-3,i+4)))sl_arr.push({i,v:l[i]});}if(!sh.length||!sl_arr.length)return{structure:'ranging',bias:'neutral',bos:false,choch:false,bos_bull:false,bos_bear:false,last_sh:h[n-1],last_sl:l[n-1]};const lsh=sh[sh.length-1].v,psh=sh.length>1?sh[sh.length-2].v:lsh;const lsl=sl_arr[sl_arr.length-1].v,psl=sl_arr.length>1?sl_arr[sl_arr.length-2].v:lsl;const lc=cs[n-1].close;const hh=lsh>psh,hl=lsl>psl,lh=lsh<psh,ll=lsl<psl;const str=hh&&hl?'uptrend':lh&&ll?'downtrend':'ranging';const bos_bull=lc>lsh,bos_bear=lc<lsl;const choch=(str==='uptrend'&&lh)||(str==='downtrend'&&hl);return{structure:str,bias:hh&&hl?'bullish':lh&&ll?'bearish':'neutral',bos:bos_bull||bos_bear,choch,bos_bull,bos_bear,last_sh:lsh,last_sl:lsl};}
+
+function detectLiquidity(cs){const h=cs.map(c=>c.high),l=cs.map(c=>c.low),n=cs.length;const lh=[],ll=[];for(let i=5;i<n-5;i++){if(h[i]===Math.max(...h.slice(i-5,i+6)))lh.push(h[i]);if(l[i]===Math.min(...l.slice(i-5,i+6)))ll.push(l[i]);}let swept_high=false,swept_low=false;if(lh.length){const rh=Math.max(...lh.slice(-5));if(cs[n-2].high>rh&&cs[n-1].close<rh)swept_high=true;}if(ll.length){const rl=Math.min(...ll.slice(-5));if(cs[n-2].low<rl&&cs[n-1].close>rl)swept_low=true;}const lc=cs[n-1].close;return{swept_high,swept_low,liq_above:lh.filter(x=>x>lc).sort((a,b)=>a-b)[0]||null,liq_below:ll.filter(x=>x<lc).sort((a,b)=>b-a)[0]||null};}
+
+function detectDivergence(cs){const closes=cs.map(c=>c.close),n=closes.length;if(n<20)return{any_bull:false,any_bear:false};const rsiArr=rsi(closes,14);const {hist}=macd(closes);const s1=closes.slice(n-20,n-10),s2=closes.slice(n-10,n);const r1=rsiArr.slice(n-20,n-10),r2=rsiArr.slice(n-10,n);const h1=hist.slice(n-20,n-10),h2=hist.slice(n-10,n);const mn=a=>Math.min(...a),mx=a=>Math.max(...a);const bull_rsi=mn(s2)<mn(s1)&&mn(r2)>mn(r1)&&r2[r2.length-1]<50;const bear_rsi=mx(s2)>mx(s1)&&mx(r2)<mx(r1)&&r2[r2.length-1]>50;const bull_macd=mn(s2)<mn(s1)&&mn(h2)>mn(h1);const bear_macd=mx(s2)>mx(s1)&&mx(h2)<mx(h1);return{any_bull:bull_rsi||bull_macd,any_bear:bear_rsi||bear_macd,bull_rsi,bear_rsi};}
+
+function detectOrderFlow(cs){const n=Math.min(20,cs.length);let buy=0,sell=0,bstr=0,bstr_b=0;for(let i=-n;i<0;i++){const c=cs[cs.length+i],v=c.volume||1,rn=Math.max(c.high-c.low,1e-10);buy+=v*(c.close-c.low)/rn;sell+=v*(c.high-c.close)/rn;}const tot=buy+sell,delta=(buy-sell)/Math.max(tot,1e-10);for(let i=0;i<5;i++){if(cs[cs.length-1-i].close>cs[cs.length-1-i].open)bstr++;else break;}for(let i=0;i<5;i++){if(cs[cs.length-1-i].close<cs[cs.length-1-i].open)bstr_b++;else break;}const ab=cs.slice(-10).reduce((s,c)=>s+Math.abs(c.close-c.open),0)/10;const lb=Math.abs(cs[cs.length-1].close-cs[cs.length-1].open);return{delta,bias:delta>0.15?'bullish':delta<-0.15?'bearish':'neutral',bull_streak:bstr,bear_streak:bstr_b,large_bull:lb>ab*1.8&&cs[cs.length-1].close>cs[cs.length-1].open,large_bear:lb>ab*1.8&&cs[cs.length-1].close<cs[cs.length-1].open};}
+
+function mtfScore(t1,t2,t3){const dirs=[t1.direction,t2.direction,t3.direction];const bc=dirs.filter(d=>d==='bullish').length,sc=dirs.filter(d=>d==='bearish').length;if(bc===3)return{score:100,direction:'BUY',label:'🟢 Всі 3 ТФ бичачі'};if(sc===3)return{score:100,direction:'SELL',label:'🔴 Всі 3 ТФ ведмежі'};if(bc===2)return{score:65,direction:'BUY',label:'🟡 2/3 ТФ бичачі'};if(sc===2)return{score:65,direction:'SELL',label:'🟠 2/3 ТФ ведмежі'};return{score:0,direction:'NEUTRAL',label:'⚪ ТФ суперечать'};}
+
+function optimalEntry(cs,dir,levels,trend,vp,liq){const close=cs[cs.length-1].close,atrArr=atr(cs),lastATR=atrArr[atrArr.length-1];const {nearest_support:ns,nearest_resistance:nr,resistance2:nr2,support2:ns2,fib_levels:fib}=levels;const {poc,val,vah}=vp;const zones=[];if(dir==='BUY'){if(fib['50.0%']&&fib['61.8%'])zones.push([(fib['50.0%']+fib['61.8%'])/2,5,'Golden Zone Fib 50-61.8%']);if(Math.abs(close-trend.ema21)/close<0.015)zones.push([trend.ema21,4,'EMA 21 підтримка']);if(val&&Math.abs(close-val)/close<0.02)zones.push([val,4,'Volume VAL']);if(poc&&poc<close)zones.push([poc,3,'Volume POC']);if(ns)zones.push([ns,3,'Рівень підтримки']);if(liq.swept_low)zones.push([close,5,'✅ Ліквідність знизу зібрана']);zones.sort((a,b)=>b[1]-a[1]||(Math.abs(close-a[0])-Math.abs(close-b[0])));const best=zones.length?zones[0][0]:close,reason=zones.length?zones[0][2]:'Поточна ціна';const sl=ns?Math.min(ns-lastATR*0.3,best-lastATR*1.5):best-lastATR*1.5;const sld=Math.abs(best-sl);const tp1=nr?Math.min(best+sld*2,nr*0.999):best+sld*2;const tp2=nr2?Math.min(best+sld*3,nr2*0.999):best+sld*3;const tp3=best+sld*5;const dist=Math.abs(close-best)/close*100;return{entry:best,sl,tp1,tp2,tp3,rr1:sld>0?Math.abs(tp1-best)/sld:0,rr2:sld>0?Math.abs(tp2-best)/sld:0,sl_pips:sld*10000,entry_label:dist<0.1?'🔴 ЗАРАЗ (Market)':dist<0.5?`🟡 LIMIT ${pf(best)}`:`⏳ ЧЕКАТИ відкату до ${pf(best)}`,entry_reason:reason};}else{if(fib['50.0%']&&fib['61.8%'])zones.push([(fib['50.0%']+fib['61.8%'])/2,5,'Golden Zone Fib 50-61.8%']);if(Math.abs(close-trend.ema21)/close<0.015)zones.push([trend.ema21,4,'EMA 21 опір']);if(vah&&Math.abs(close-vah)/close<0.02)zones.push([vah,4,'Volume VAH']);if(poc&&poc>close)zones.push([poc,3,'Volume POC']);if(nr)zones.push([nr,3,'Рівень опору']);if(liq.swept_high)zones.push([close,5,'✅ Ліквідність зверху зібрана']);zones.sort((a,b)=>b[1]-a[1]||(Math.abs(close-a[0])-Math.abs(close-b[0])));const best=zones.length?zones[0][0]:close,reason=zones.length?zones[0][2]:'Поточна ціна';const sl=nr?Math.max(nr+lastATR*0.3,best+lastATR*1.5):best+lastATR*1.5;const sld=Math.abs(sl-best);const tp1=ns?Math.max(best-sld*2,ns*1.001):best-sld*2;const tp2=ns2?Math.max(best-sld*3,ns2*1.001):best-sld*3;const tp3=best-sld*5;const dist=Math.abs(close-best)/close*100;return{entry:best,sl,tp1,tp2,tp3,rr1:sld>0?Math.abs(tp1-best)/sld:0,rr2:sld>0?Math.abs(tp2-best)/sld:0,sl_pips:sld*10000,entry_label:dist<0.1?'🔴 ЗАРАЗ (Market)':dist<0.5?`🟡 LIMIT ${pf(best)}`:`⏳ ЧЕКАТИ відкату до ${pf(best)}`,entry_reason:reason};}
+  return{entry:close,sl:close,tp1:close,tp2:close,tp3:close,rr1:0,rr2:0,sl_pips:0,entry_label:'Немає',entry_reason:''};}
+
+function probabilityScore(data){const{direction:d,trend,adx,rsi:rsiV,stoch,patterns,divergence,smc,liquidity,orderflow,mtf,entry}=data;if(d==='NEUTRAL')return{probability:0,grade:'D  (Не торгувати)',factors:[]};const isBuy=d==='BUY';let score=0,max=0;const factors=[];function add(w,cond,lbl){max+=w;if(cond){score+=w;factors.push(['✅',lbl,w]);}else factors.push(['❌',lbl,0]);}
+add(15,trend.direction===(isBuy?'bullish':'bearish'),`Тренд ${isBuy?'висхідний':'низхідний'}`);
+add(10,['strong','moderate'].includes(trend.strength),`Сила тренду: ${trend.strength}`);
+add(20,mtf.direction===d&&mtf.score>=65,`MTF: ${mtf.label}`);
+add(8,smc.bias===(isBuy?'bullish':'bearish'),'SMC Bias підтверджує');
+add(7,isBuy?liquidity.swept_low:liquidity.swept_high,'Liquidity Sweep підтверджує');
+add(10,adx.adx>=20,`ADX ${adx.adx.toFixed(0)}`);
+add(8,isBuy?rsiV<40:rsiV>60,`RSI ${rsiV.toFixed(0)}`);
+add(7,isBuy?stoch<30:stoch>70,`Stoch RSI ${stoch.toFixed(0)}`);
+add(10,isBuy?divergence.any_bull:divergence.any_bear,'Дивергенція RSI/MACD');
+const bp=['bullish_engulfing','morning_star','three_white','bullish_pinbar','hammer'],bearP=['bearish_engulfing','evening_star','three_black','bearish_pinbar','shooting_star'];
+add(10,(isBuy?bp:bearP).some(p=>patterns.includes(p)),'Сильний паттерн підтверджує');
+add(6,orderflow.bias===(isBuy?'bullish':'bearish'),'Order Flow');
+add(5,entry.rr1>=2,'RR ≥ 1:2');
+const prob=Math.round(score/Math.max(max,1)*100);
+let grade;if(prob>=80)grade='A+ (Відмінний)';else if(prob>=65)grade='A  (Сильний)';else if(prob>=50)grade='B  (Помірний)';else if(prob>=35)grade='C  (Слабкий)';else grade='D  (Не торгувати)';
+return{probability:prob,grade,factors:factors.filter(f=>f[0]==='✅')};}
+
+// ═══════════════════════════════════════════════════════════
+//  MAIN ANALYZE
+// ═══════════════════════════════════════════════════════════
+async function analyze(sym,tf){
+  const cs=await fetchOHLCV(sym,tf,100);
+  if(cs.length<20)throw new Error(`Недостатньо даних для ${sym}`);
+  const ctx=CTX_TF[tf]||'1d',ctx2=CTX2_TF[tf]||'1wk';
+  let csCtx=cs,csCtx2=cs;
+  try{csCtx=await fetchOHLCV(sym,ctx,60);}catch(e){}
+  try{csCtx2=await fetchOHLCV(sym,ctx2,60);}catch(e){}
+  const closes=cs.map(c=>c.close);
+  const rsiArr=rsi(closes),stochArr=stochRsi(closes),atrArr=atr(cs);
+  const {hist}=macd(closes),adxD=adxCalc(cs);
+  const willy=williams(cs),cciArr=cci(cs);
+  const vp=volumeProfile(cs),vwapV=vwap(cs);
+  const trend=detectTrend(cs),ctxTrend=detectTrend(csCtx),ctx2Trend=detectTrend(csCtx2);
+  const levels=findLevels(cs),pats=detectPatterns(cs);
+  const smc=detectSMC(cs),liq=detectLiquidity(cs);
+  const div=detectDivergence(cs),of=detectOrderFlow(cs);
+  const mtf=mtfScore(ctx2Trend,ctxTrend,trend);
+  const lastRSI=rsiArr[rsiArr.length-1],lastStoch=stochArr[stochArr.length-1];
+  const lastHist=hist[hist.length-1],lastWilly=willy[willy.length-1],lastCCI=cciArr[cciArr.length-1];
+  // Direction vote
+  let buy=0,sell=0;
+  if(trend.direction==='bullish')buy+=3;else if(trend.direction==='bearish')sell+=3;
+  if(smc.bias==='bullish')buy+=3;else if(smc.bias==='bearish')sell+=3;
+  if(mtf.direction==='BUY')buy+=4;else if(mtf.direction==='SELL')sell+=4;
+  if(adxD.direction==='bullish')buy+=2;else if(adxD.direction==='bearish')sell+=2;
+  if(lastRSI<45)buy+=2;else if(lastRSI>55)sell+=2;
+  if(lastStoch<40)buy+=1;else if(lastStoch>60)sell+=1;
+  if(lastHist>0)buy+=2;else if(lastHist<0)sell+=2;
+  if(div.any_bull)buy+=3;if(div.any_bear)sell+=3;
+  if(liq.swept_low)buy+=4;if(liq.swept_high)sell+=4;
+  if(of.bias==='bullish')buy+=2;else if(of.bias==='bearish')sell+=2;
+  const bullP=['bullish_pinbar','bullish_engulfing','hammer','morning_star','three_white','tweezer_bottom'];
+  const bearP=['bearish_pinbar','bearish_engulfing','shooting_star','evening_star','three_black','tweezer_top'];
+  if(bullP.some(p=>pats.includes(p)))buy+=2;if(bearP.some(p=>pats.includes(p)))sell+=2;
+  if(lastWilly<-80)buy+=1;else if(lastWilly>-20)sell+=1;
+  if(lastCCI<-100)buy+=1;else if(lastCCI>100)sell+=1;
+  const tot=buy+sell;
+  let dir='NEUTRAL',rawConf=0;
+  if(tot>0){if(buy>sell){dir='BUY';rawConf=Math.round(buy/tot*100);}else{dir='SELL';rawConf=Math.round(sell/tot*100);}}
+  // Entry
+  let entryD={entry:cs[cs.length-1].close,sl:0,tp1:0,tp2:0,tp3:0,rr1:0,rr2:0,sl_pips:0,entry_label:'—',entry_reason:'—'};
+  if(dir!=='NEUTRAL')entryD=optimalEntry(cs,dir,levels,trend,vp,liq);
+  // Probability
+  const prob=probabilityScore({direction:dir,trend,adx:adxD,rsi:lastRSI,stoch:lastStoch,patterns:pats,divergence:div,smc,liquidity:liq,orderflow:of,mtf,entry:entryD});
+  // Confidence
+  let conf=prob.probability;
+  if(lastRSI<30&&dir==='BUY')conf=Math.min(conf+8,100);
+  else if(lastRSI>70&&dir==='SELL')conf=Math.min(conf+8,100);
+  if(adxD.adx>30&&dir!=='NEUTRAL')conf=Math.min(conf+7,100);
+  else if(adxD.adx<15)conf=Math.max(conf-5,0);
+  if(dir==='BUY'&&lastHist>0)conf=Math.min(conf+5,100);
+  else if(dir==='SELL'&&lastHist<0)conf=Math.min(conf+5,100);
+  if(dir!=='NEUTRAL'&&ctxTrend.direction!==trend.direction&&ctxTrend.direction!=='sideways')conf=Math.max(conf-20,0);
+  if(smc.bos&&dir!=='NEUTRAL')conf=Math.min(conf+8,100);
+  if(smc.choch)conf=Math.max(conf-10,0);
+  if(entryD.rr1<1.5)conf=Math.max(conf-20,0);
+  return{sym,tf,ctx_tf:ctx,ctx2_tf:ctx2,price:cs[cs.length-1].close,direction:dir,confidence:conf,
+    trend,ctx_trend:ctxTrend,ctx2_trend:ctx2Trend,levels,smc,liquidity:liq,vol_profile:vp,
+    divergence:div,order_flow:of,mtf,adx:adxD,rsi:lastRSI,stoch_k:lastStoch,
+    macd_hist:lastHist,williams_r:lastWilly,cci:lastCCI,vwap:vwapV,
+    candle_patterns:pats,entry:entryD,probability:prob,timestamp:new Date()};
+}
+
+// ═══════════════════════════════════════════════════════════
+//  FORMAT HELPERS
+// ═══════════════════════════════════════════════════════════
+function pf(p,sym=''){if(!p||isNaN(p))return'N/A';const v=+p;if(sym.includes('BTC')||v>1000)return v.toLocaleString('uk',{minimumFractionDigits:2,maximumFractionDigits:2});if(v>10)return v.toFixed(4);return v.toFixed(5);}
+function bar(v,w=10){const f=Math.min(Math.round(+v/100*w),w);return'█'.repeat(f)+'░'.repeat(w-f);}
+function probClass(p){return p>=65?'prob-A':p>=50?'prob-B':p>=35?'prob-C':'prob-D';}
+function trendHTML(d,s=''){const icon=d==='bullish'?'📈':d==='bearish'?'📉':'➡️';const cls=d==='bullish'?'bull':d==='bearish'?'bear':'neut';return`<span class="badge badge-${cls}">${icon} ${d==='bullish'?'Висхідний':d==='bearish'?'Низхідний':'Флет'}${s?' · '+s:''}</span>`;}
+
+// ═══════════════════════════════════════════════════════════
+//  UI PAGES
+// ═══════════════════════════════════════════════════════════
+function showPage(name){
+  ['analysis','scan','journal','calc','learn'].forEach(p=>{
+    document.getElementById(`page-${p}`).classList.toggle('hidden',p!==name);
+    document.getElementById(`nav-${p}`).classList.toggle('active',p===name);
+  });
+  const subs={analysis:'Технічний аналіз v4',scan:'Авто-скан',journal:'Торговий журнал',calc:'Risk Management',learn:'Навчання'};
+  document.getElementById('headerSub').textContent=subs[name]||'';
+  if(name==='calc'){calcR();buildRiskTable();}
+  if(name==='journal')renderJournal();
+  if(name==='learn'){renderLearnHome();S.learnStack=[];}
+}
+
+// ═══════════════════════════════════════════════════════════
+//  ANALYSIS PAGE
+// ═══════════════════════════════════════════════════════════
+function setCategory(cat){
+  S.category=cat;
+  document.querySelectorAll('#catTabs .tab-btn').forEach((b,i)=>b.classList.toggle('active',['forex','crypto','indices','commodities'][i]===cat));
+  renderPairs();
+}
+function renderPairs(){
+  document.getElementById('pairsGrid').innerHTML=(PAIRS[S.category]||[]).map(p=>`
+    <div class="pair-btn${p.s===S.pair?' active':''}" onclick="selectPair('${p.s}')">
+      <div class="pair-name">${p.l}</div>
+      <div class="pair-price" id="px_${p.s.replace(/[^a-zA-Z0-9]/g,'_')}">—</div>
+    </div>`).join('');
+}
+function selectPair(sym){S.pair=sym;renderPairs();loadChart();}
+function setTF(tf){
+  S.tf=tf;
+  document.querySelectorAll('.tf-btn').forEach(b=>{
+    const m={'M5':'5m','M15':'15m','M30':'30m','H1':'1h','H4':'4h','D1':'1d','W1':'1wk'};
+    b.classList.toggle('active',m[b.textContent]===tf);
+  });
+  loadChart();
+}
+
+async function loadChart(){
+  const container=document.getElementById('chart');
+  if(S.chart){S.chart.remove();S.chart=null;}
+  const chart=LightweightCharts.createChart(container,{
+    width:container.offsetWidth,height:260,
+    layout:{background:{color:'#111827'},textColor:'#94a3b8'},
+    grid:{vertLines:{color:'#1e3a5f'},horzLines:{color:'#1e3a5f'}},
+    crosshair:{mode:LightweightCharts.CrosshairMode.Normal},
+    rightPriceScale:{borderColor:'#1e3a5f'},
+    timeScale:{borderColor:'#1e3a5f',timeVisible:true},
+  });
+  const cs_series=chart.addCandlestickSeries({upColor:'#22c55e',downColor:'#ef4444',borderUpColor:'#22c55e',borderDownColor:'#ef4444',wickUpColor:'#22c55e',wickDownColor:'#ef4444'});
+  const e21s=chart.addLineSeries({color:'#3b82f6',lineWidth:1,priceLineVisible:false,crosshairMarkerVisible:false});
+  const e50s=chart.addLineSeries({color:'#f59e0b',lineWidth:1,priceLineVisible:false,crosshairMarkerVisible:false});
+  S.chart=chart;
+  document.getElementById('chartOverlay').innerHTML=`<span class="ind-badge-sm text-accent">EMA 21</span><span class="ind-badge-sm text-yellow">EMA 50</span><span class="ind-badge-sm text-muted" id="chartStatus">Завантаження...</span>`;
+  try{
+    const candles=await fetchOHLCV(S.pair,S.tf,100);
+    cs_series.setData(candles);
+    const closes=candles.map(c=>c.close);
+    e21s.setData(candles.map((c,i)=>({time:c.time,value:ema(closes.slice(0,i+1),21).pop()})));
+    e50s.setData(candles.map((c,i)=>({time:c.time,value:ema(closes.slice(0,i+1),50).pop()})));
+    chart.timeScale().fitContent();
+    const last=candles[candles.length-1];
+    document.getElementById('chartStatus').textContent=`Live · ${pf(last.close,S.pair)}`;
+    const el=document.getElementById(`px_${S.pair.replace(/[^a-zA-Z0-9]/g,'_')}`);
+    if(el)el.textContent=pf(last.close,S.pair);
+  }catch(e){document.getElementById('chartStatus').textContent='⚠️ '+e.message;}
+  const ro=new ResizeObserver(()=>chart.applyOptions({width:container.offsetWidth}));
+  ro.observe(container);
+}
+
+async function runAnalysis(){
+  const btn=document.getElementById('analyzeBtn');
+  btn.textContent='⏳ Аналізую...';btn.disabled=true;
+  document.getElementById('analysisResults').innerHTML=`<div class="loader"><div class="spinner"></div><div class="loader-txt">Завантажую 3 таймфрейми...<br>SMC · MTF · Volume Profile · Divergence...</div></div>`;
+  try{
+    const r=await analyze(S.pair,S.tf);
+    S.lastResult=r;
+    renderResult(r);
+  }catch(e){
+    document.getElementById('analysisResults').innerHTML=`<div class="card" style="border-color:rgba(239,68,68,.3)"><div class="text-red bold">❌ Помилка аналізу</div><div class="small text-muted mt-8">${e.message}</div><div class="small text-muted">Перевірте API ключ або зачекайте 1 хвилину (rate limit)</div></div>`;
+  }
+  btn.textContent='🔍 Повний аналіз v4';btn.disabled=false;
+}
+
+function renderResult(r){
+  const d=r.direction,conf=r.confidence,sym=r.sym;
+  const icon=d==='BUY'?'📈':d==='SELL'?'📉':'➖';
+  const dCls=d.toLowerCase(),pr=r.probability;
+  const en=r.entry,trend=r.trend,smc=r.smc,liq=r.liquidity,div=r.divergence,of=r.order_flow,mtf=r.mtf,adx=r.adx,vp=r.vol_profile,lv=r.levels;
+  // Grade color
+  const gc=pr.probability>=65?'text-green':pr.probability>=50?'text-accent':pr.probability>=35?'text-yellow':'text-red';
+  // Patterns
+  const patsHTML=(r.candle_patterns||[]).map(p=>{const b=p.includes('bull')||p.includes('hammer')||p.includes('morning')||p.includes('three_white')||p.includes('tweezer_bottom');const bear=p.includes('bear')||p.includes('shoot')||p.includes('evening')||p.includes('three_black')||p.includes('tweezer_top');return`<span class="pat-chip ${b?'pat-bull':bear?'pat-bear':'pat-neut'}">${PAT_LABELS[p]||p}</span>`;}).join('');
+  // Strategies (use strats from probability factors)
+  const strats=[
+    {name:'Відбій від рівня',score:0,dir:'NEUTRAL'},{name:'Пробій + ретест',score:0,dir:'NEUTRAL'},
+    {name:'Тренд + корекція',score:0,dir:'NEUTRAL'},{name:'Діапазон',score:0,dir:'NEUTRAL'},
+    {name:'EMA Crossover',score:0,dir:'NEUTRAL'},
+  ];
+  // Warnings
+  const warns=[];
+  if(conf<40)warns.push('❌ Confidence < 40% — угоду пропустити');
+  if(en.rr1<1.5)warns.push('⚠️ RR < 1:2 — невигідно');
+  if(smc.choch)warns.push('⚠️ CHoCH — можливий розворот тренду');
+  if(r.rsi>70&&d==='BUY')warns.push('⚠️ RSI перекуплений (>70)');
+  if(r.rsi<30&&d==='SELL')warns.push('⚠️ RSI перепроданий (<30)');
+  const warnHTML=warns.length?`<div class="warn-box"><div class="warn-title">⚠️ Попередження</div>${warns.map(w=>`<div class="warn-item">${w}</div>`).join('')}</div>`:'';
+  // Fib
+  const fibHTML=Object.keys(lv.fib_levels||{}).length?`<div class="level-item" style="grid-column:span 2"><div class="level-label">📐 Fibonacci</div><div style="display:flex;flex-wrap:wrap;gap:8px;margin-top:4px">${Object.entries(lv.fib_levels).slice(0,5).map(([k,v])=>`<span style="font-size:11px"><span style="color:var(--text3)">${k}:</span> <b class="lv-purple">${pf(v,sym)}</b></span>`).join('')}</div></div>`:'';
+  document.getElementById('analysisResults').innerHTML=`
+<!-- Signal -->
+<div class="signal-card mt-8">
+  <div class="sig-icon ${dCls}">${icon}</div>
+  <div style="flex:1">
+    <div class="sig-dir ${dCls}">${d}</div>
+    <div class="sig-sub">${r.tf.toUpperCase()} · ${r.timestamp.toLocaleTimeString('uk')}</div>
+    <div class="small mt-8"><span class="${gc} bold">${pr.grade}</span> · ${pr.probability}% probability</div>
+    <div class="small">Confidence: ${conf}%</div>
+    <div class="prog-wrap"><div class="prog-fill ${dCls}" style="width:${conf}%"></div></div>
+  </div>
+</div>
+
+<!-- Probability -->
+<div class="card ${probClass(pr.probability)}">
+  <div class="card-title">🏆 Probability Score</div>
+  <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px">
+    <div style="font-size:28px;font-weight:800;color:${pr.probability>=65?'var(--green)':pr.probability>=50?'var(--accent)':pr.probability>=35?'var(--yellow)':'var(--red)'}">${pr.probability}%</div>
+    <div><div class="bold">${pr.grade}</div><div class="small text-muted">${bar(pr.probability,100,8)} Confidence: ${conf}%</div></div>
+  </div>
+  ${pr.factors.slice(0,5).map(f=>`<div class="factor-item">${f[0]} ${f[1]}</div>`).join('')}
+</div>
+
+<!-- Entry Zone -->
+<div class="card">
+  <div class="card-title">🎯 Оптимальна точка входу</div>
+  <div style="background:var(--bg3);border-radius:8px;padding:12px;margin-bottom:10px">
+    <div class="bold" style="margin-bottom:4px">${en.entry_label}</div>
+    <div class="small text-muted">${en.entry_reason}</div>
+  </div>
+  <div class="levels-grid">
+    <div class="level-item"><div class="level-label">📍 Ціна</div><div class="level-value lv-accent">${pf(r.price,sym)}</div></div>
+    <div class="level-item"><div class="level-label">🛑 Stop Loss</div><div class="level-value lv-red">${pf(en.sl,sym)}</div></div>
+    <div class="level-item"><div class="level-label">🎯 TP1 (RR 1:${en.rr1.toFixed(1)})</div><div class="level-value lv-green">${pf(en.tp1,sym)}</div></div>
+    <div class="level-item"><div class="level-label">🎯 TP2 (RR 1:${en.rr2.toFixed(1)})</div><div class="level-value lv-green">${pf(en.tp2,sym)}</div></div>
+    <div class="level-item"><div class="level-label">🎯 TP3 (RR 1:5.0)</div><div class="level-value lv-green">${pf(en.tp3,sym)}</div></div>
+    <div class="level-item"><div class="level-label">📏 SL (пп)</div><div class="level-value">${en.sl_pips.toFixed(1)}</div></div>
+    <div class="level-item"><div class="level-label">🟢 Підтримка</div><div class="level-value lv-green">${pf(lv.nearest_support,sym)}</div></div>
+    <div class="level-item"><div class="level-label">🔴 Опір</div><div class="level-value lv-red">${pf(lv.nearest_resistance,sym)}</div></div>
+    ${fibHTML}
+  </div>
+</div>
+
+<!-- MTF -->
+<div class="card">
+  <div class="card-title">📊 Multi-Timeframe Confluence</div>
+  <div class="ind-row"><div class="ind-name">🗺 ${r.ctx2_tf.toUpperCase()} (Старший)</div>${trendHTML(r.ctx2_trend.direction,r.ctx2_trend.strength)}</div>
+  <div class="ind-row"><div class="ind-name">📈 ${r.ctx_tf.toUpperCase()} (Контекст)</div>${trendHTML(r.ctx_trend.direction,r.ctx_trend.strength)}</div>
+  <div class="ind-row"><div class="ind-name">⚡ ${r.tf.toUpperCase()} (Поточний)</div>${trendHTML(trend.direction,trend.strength)}</div>
+  <div class="ind-row"><div class="ind-name">🔗 Confluence</div><span class="badge badge-${mtf.direction==='BUY'?'bull':mtf.direction==='SELL'?'bear':'neut'}">${mtf.label}</span></div>
+</div>
+
+<!-- SMC -->
+<div class="card">
+  <div class="card-title">🧠 Smart Money Concepts</div>
+  <div class="smc-grid">
+    <div class="smc-item"><div class="smc-label">Структура</div><div class="smc-val">${smc.structure==='uptrend'?'📈 Uptrend':smc.structure==='downtrend'?'📉 Downtrend':'➡️ Ranging'}</div></div>
+    <div class="smc-item"><div class="smc-label">SMC Bias</div><div class="smc-val ${smc.bias==='bullish'?'text-green':smc.bias==='bearish'?'text-red':'text-muted'}">${smc.bias==='bullish'?'🟢 Bullish':smc.bias==='bearish'?'🔴 Bearish':'⚪ Neutral'}</div></div>
+    <div class="smc-item"><div class="smc-label">BOS</div><div class="smc-val ${smc.bos?'text-green':'text-muted'}">${smc.bos?'✅ Так':'❌ Ні'}</div></div>
+    <div class="smc-item"><div class="smc-label">CHoCH</div><div class="smc-val ${smc.choch?'text-yellow':'text-muted'}">${smc.choch?'⚠️ Так':'✅ Ні'}</div></div>
+  </div>
+  <div class="ind-row mt-8"><div class="ind-name">💧 Liquidity Sweep знизу</div><span class="badge ${liq.swept_low?'badge-bull':'badge-neut'}">${liq.swept_low?'🔥 Так → BUY!':'Ні'}</span></div>
+  <div class="ind-row"><div class="ind-name">💧 Liquidity Sweep зверху</div><span class="badge ${liq.swept_high?'badge-bear':'badge-neut'}">${liq.swept_high?'🔥 Так → SELL!':'Ні'}</span></div>
+</div>
+
+<!-- Indicators -->
+<div class="card">
+  <div class="card-title">📊 Індикатори</div>
+  <div class="ind-row"><div class="ind-name">📊 ADX</div><div class="ind-val">${adx.adx.toFixed(0)} <span class="small text-muted">${adx.strong?'✅ сильний':'➡️ слабкий'}</span></div></div>
+  <div class="ind-row"><div class="ind-name">${r.rsi>70?'🔴':r.rsi<30?'🟢':'🟡'} RSI (${r.rsi.toFixed(0)})</div><span class="badge ${r.rsi>70?'badge-bear':r.rsi<30?'badge-bull':'badge-neut'}">${r.rsi>70?'Перекуплено':r.rsi<30?'Перепродано':'Нейтрально'}</span></div>
+  <div class="ind-row"><div class="ind-name">${r.stoch_k>80?'🔴':r.stoch_k<20?'🟢':'🟡'} Stoch RSI (${r.stoch_k.toFixed(0)})</div><span class="badge ${r.stoch_k>80?'badge-bear':r.stoch_k<20?'badge-bull':'badge-neut'}">${r.stoch_k>80?'Перекуплено':r.stoch_k<20?'Перепродано':'Нейтрально'}</span></div>
+  <div class="ind-row"><div class="ind-name">${r.macd_hist>0?'🟢':'🔴'} MACD</div><span class="badge ${r.macd_hist>0?'badge-bull':'badge-bear'}">${r.macd_hist>0?'Бичачий ↑':'Ведмежий ↓'}</span></div>
+  <div class="ind-row"><div class="ind-name">🌊 Williams %R (${r.williams_r.toFixed(0)})</div><div class="ind-val small">${r.williams_r<-80?'Перепродано':r.williams_r>-20?'Перекуплено':'Нейтрально'}</div></div>
+  <div class="ind-row"><div class="ind-name">📐 CCI (${r.cci.toFixed(0)})</div><div class="ind-val small">${r.cci<-100?'Перепродано':r.cci>100?'Перекуплено':'Нейтрально'}</div></div>
+  <div class="ind-row"><div class="ind-name">${div.any_bull?'🟢':div.any_bear?'🔴':'⚪'} Дивергенція</div><div class="ind-val small">${div.any_bull?'Бичача 🚀':div.any_bear?'Ведмежа 📉':'Не виявлено'}</div></div>
+  <div class="ind-row"><div class="ind-name">💧 Order Flow</div><span class="badge badge-${of.bias==='bullish'?'bull':of.bias==='bearish'?'bear':'neut'}">${of.bias} (δ${of.delta.toFixed(2)})</span></div>
+  <div class="ind-row"><div class="ind-name">📦 Volume Profile (POC)</div><div class="ind-val small lv-purple">${pf(vp.poc,sym)}</div></div>
+  <div style="padding-top:8px"><div class="small text-muted mb-4">🕯 Свічкові паттерни:</div><div class="pat-wrap">${patsHTML||'<span class="small text-muted">Не виявлено</span>'}</div></div>
+</div>
+
+${warnHTML}
+  `;
+}
+
+// ═══════════════════════════════════════════════════════════
+//  SCAN
+// ═══════════════════════════════════════════════════════════
+function setScanCat(cat){
+  S.scanCat=cat;
+  document.querySelectorAll('#scanCatTabs .tab-btn').forEach((b,i)=>b.classList.toggle('active',['forex','crypto','all'][i]===cat));
+}
+async function runScan(){
+  const pairs=SCAN_PAIRS[S.scanCat]||SCAN_PAIRS.forex;
+  const el=document.getElementById('scanResults');
+  el.innerHTML=`<div class="loader"><div class="spinner"></div><div class="loader-txt">Аналізую ${pairs.length} пар з реальними даними...</div><div style="width:200px;height:4px;background:var(--border);border-radius:2px;margin-top:10px"><div id="scanProg" style="width:0%;height:100%;background:var(--accent);border-radius:2px;transition:.3s"></div></div></div>`;
+  const results=[];
+  for(let idx=0;idx<pairs.length;idx++){
+    const sym=pairs[idx];
+    try{
+      const r=await analyze(sym,'1h');
+      results.push({sym,dir:r.direction,conf:r.confidence,prob:r.probability.probability,grade:r.probability.grade,entry:r.entry,liq:r.liquidity,div:r.divergence,mtf:r.mtf,rsi:r.rsi,adx:r.adx.adx,pats:r.candle_patterns});
+    }catch(e){results.push({sym,dir:'ERROR',conf:0,prob:0,grade:'—',entry:{},liq:{},div:{},mtf:{},rsi:50,adx:0,pats:[]});}
+    document.getElementById('scanProg').style.width=`${(idx+1)/pairs.length*100}%`;
+  }
+  results.sort((a,b)=>a.dir==='ERROR'?1:b.dir==='ERROR'?-1:b.prob-a.prob);
+  const html=results.map(r=>{
+    const dCls=(r.dir||'neutral').toLowerCase();const icon=r.dir==='BUY'?'↑':r.dir==='SELL'?'↓':'—';
+    const liqBadge=r.liq?.swept_low||r.liq?.swept_high?'<span class="badge badge-warn">🔥 LiqSweep</span> ':'';
+    const divBadge=r.div?.any_bull||r.div?.any_bear?'<span class="badge badge-bull">📊 Div</span> ':'';
+    const pats=r.pats.slice(0,2).map(p=>PAT_LABELS[p]||p).join(', ')||'—';
+    return`<div class="scan-item" onclick="selectPairScan('${r.sym}')">
+      <div class="scan-sig ${dCls}">${icon}</div>
+      <div style="flex:1">
+        <div class="bold">${r.sym}</div>
+        <div class="small">${r.mtf?.label||'—'}</div>
+        <div class="small text-muted">${liqBadge}${divBadge}ADX ${r.adx?.toFixed(0)||'—'} · RSI ${r.rsi?.toFixed(0)||'—'}</div>
+        <div class="small text-muted">${pats}</div>
+        <div class="small mt-8">${r.entry?.entry_label||'—'}</div>
+      </div>
+      <div style="text-align:right"><div class="bold ${r.dir==='BUY'?'text-green':r.dir==='SELL'?'text-red':'text-muted'}">${r.prob}%</div><div class="small text-muted">${r.grade?.slice(0,2)||'—'}</div></div>
+    </div>`;
+  }).join('');
+  el.innerHTML=html||`<div class="empty"><div class="empty-icon">🔍</div><div class="empty-text">Немає сигналів</div></div>`;
+  showToast(`✅ Скан: ${results.filter(r=>r.dir==='BUY').length} BUY · ${results.filter(r=>r.dir==='SELL').length} SELL`);
+}
+function selectPairScan(sym){S.pair=sym;showPage('analysis');renderPairs();loadChart();}
+
+// ═══════════════════════════════════════════════════════════
+//  CALCULATOR
+// ═══════════════════════════════════════════════════════════
+function calcR(){
+  const dep=+document.getElementById('cDep').value||50,risk=+document.getElementById('cRisk').value||2;
+  const entry=+document.getElementById('cEntry').value||0,sl=+document.getElementById('cSL').value||0;
+  const tp=+document.getElementById('cTP').value||0,pipV=+document.getElementById('cPipV').value||0.1;
+  const riskUSD=dep*risk/100;
+  document.getElementById('rRisk').textContent='$'+riskUSD.toFixed(2);
+  document.getElementById('rMaxL').textContent='$'+(dep*0.05).toFixed(2);
+  if(entry&&sl&&Math.abs(sl-entry)>0){
+    const slPips=Math.abs(entry-sl)*10000,tpPips=tp?Math.abs(tp-entry)*10000:0;
+    const lot=riskUSD/(slPips*pipV),rr=tpPips/slPips,profit=tpPips*pipV*lot;
+    document.getElementById('rLot').textContent=lot.toFixed(2)+' лот';
+    document.getElementById('rSLPips').textContent=slPips.toFixed(1)+' пп';
+    document.getElementById('rTPPips').textContent=tpPips?tpPips.toFixed(1)+' пп':'—';
+    document.getElementById('rRR2').textContent=rr?'1:'+rr.toFixed(2):'—';
+    document.getElementById('rProfit').textContent=profit?'$'+profit.toFixed(2):'—';
+  }
+}
+function buildRiskTable(){
+  const dep=+document.getElementById('cDep').value||50;
+  document.getElementById('riskTable').innerHTML=`
+    <div class="ind-row"><div class="ind-name bold">Ризик %</div><div class="ind-val bold">Сума ризику</div></div>
+    ${[1,2,3,5].map(r=>`<div class="ind-row"><div class="ind-name">${r}%</div><div class="ind-val text-${r<=2?'green':'red'}">$${(dep*r/100).toFixed(2)}</div></div>`).join('')}
+    <div class="ind-row"><div class="ind-name">Макс. день (5%)</div><div class="ind-val text-red">$${(dep*0.05).toFixed(2)}</div></div>
+    <div class="ind-row"><div class="ind-name">Макс. тиждень (10%)</div><div class="ind-val text-red">$${(dep*0.1).toFixed(2)}</div></div>`;
+}
+
+// ═══════════════════════════════════════════════════════════
+//  JOURNAL
+// ═══════════════════════════════════════════════════════════
+function addJournalEntry(){
+  const pair=document.getElementById('jPair').value.trim();
+  const dir=document.getElementById('jDir').value;
+  const result=parseFloat(document.getElementById('jResult').value);
+  const rr=parseFloat(document.getElementById('jRR').value)||0;
+  const strat=document.getElementById('jStrat').value;
+  const note=document.getElementById('jNote').value.trim();
+  const entry=parseFloat(document.getElementById('jEntry').value)||0;
+  const sl=parseFloat(document.getElementById('jSL').value)||0;
+  if(!pair||isNaN(result)){showToast('⚠️ Заповніть пару та результат');return;}
+  S.journal.unshift({id:Date.now(),date:new Date().toLocaleDateString('uk'),pair,dir,result,rr,strat,note,entry,sl});
+  localStorage.setItem('tbJournal',JSON.stringify(S.journal));
+  ['jPair','jResult','jRR','jNote','jEntry','jSL'].forEach(id=>document.getElementById(id).value='');
+  renderJournal();showToast('✅ Угоду збережено');
+}
+function clearJournal(){if(confirm('Очистити журнал?')){S.journal=[];localStorage.setItem('tbJournal','[]');renderJournal();}}
+function renderJournal(){
+  const j=S.journal;const wins=j.filter(e=>e.result>0).length;
+  const pl=j.reduce((s,e)=>s+e.result,0);const avgRR=j.length?(j.reduce((s,e)=>s+(e.rr||0),0)/j.length).toFixed(2):0;
+  document.getElementById('sWR').textContent=j.length?Math.round(wins/j.length*100)+'%':'0%';
+  document.getElementById('sTrades').textContent=j.length;
+  document.getElementById('sPL').textContent=(pl>=0?'+':'')+pl.toFixed(2)+'$';
+  document.getElementById('sPL').className='stat-val '+(pl>=0?'text-green':'text-red');
+  document.getElementById('sRR').textContent='1:'+avgRR;
+  document.getElementById('journalEntries').innerHTML=!j.length?`<div class="empty"><div class="empty-icon">📝</div><div class="empty-text">Журнал порожній</div></div>`:j.slice(0,20).map(e=>`<div class="entry-item"><div class="entry-head"><div class="entry-pair">${e.dir==='BUY'?'🟢':'🔴'} ${e.pair}</div><div class="entry-res ${e.result>=0?'win':'loss'}">${e.result>=0?'+':''}${e.result.toFixed(2)}$</div></div><div class="entry-detail"><span>📅 ${e.date}</span><span>⚖️ RR 1:${e.rr||0}</span><span>📊 ${e.strat||'—'}</span></div>${e.note?`<div class="entry-note">💬 ${e.note}</div>`:''}</div>`).join('');
+}
+
+// ═══════════════════════════════════════════════════════════
+//  LEARNING
+// ═══════════════════════════════════════════════════════════
+const LEARN_CATS=[
+  {key:'candlesticks',icon:'🕯',title:'Свічкові паттерни',desc:'14 паттернів з поясненням'},
+  {key:'strategies',icon:'📐',title:'Стратегії',desc:'5 стратегій з алгоритмами входу'},
+  {key:'concepts',icon:'📚',title:'Ключові концепції',desc:'Рівні, тренди, RM, Fibonacci'},
+  {key:'smc',icon:'🏦',title:'Smart Money Concepts',desc:'BOS, CHoCH, Ліквідність, OB'},
+  {key:'psychology',icon:'🧘',title:'Психологія',desc:'FOMO, Revenge, Дисципліна'},
+];
+const LEARN_TOPICS={
+  candlesticks:[{key:'pin_bar',title:'📍 Пін-бар'},{key:'engulfing',title:'🟢 Поглинання'},{key:'doji',title:'➕ Доджі'},{key:'morning_star',title:'⭐ Ранкова/Вечірня зірка'},{key:'hammer',title:'🔨 Молот і Зірка'},{key:'three_soldiers',title:'🟢🟢🟢 Три солдати / Ворони'},{key:'inside_bar',title:'📦 Inside Bar'},{key:'tweezer',title:'🔧 Пінцет'}],
+  strategies:[{key:'s1_level_bounce',title:'1️⃣ Відбій від рівня'},{key:'s2_breakout',title:'2️⃣ Пробій + ретест'},{key:'s3_pullback',title:'3️⃣ Тренд + корекція'},{key:'s4_range',title:'4️⃣ Діапазонна торгівля'},{key:'s5_ema',title:'5️⃣ EMA Crossover'}],
+  concepts:[{key:'support_resistance',title:'📐 Підтримка та опір'},{key:'trend_structure',title:'📈 Структура тренду'},{key:'risk_management',title:'⚠️ Управління ризиками'},{key:'timeframes',title:'⏱ Таймфрейми (MTF)'},{key:'fibonacci',title:'🌀 Fibonacci'},{key:'volume',title:'📊 Аналіз обсягу'}],
+  smc:[{key:'bos_choch',title:'💥 BOS та CHoCH'},{key:'liquidity',title:'💧 Зони ліквідності'},{key:'order_blocks',title:'📦 Order Blocks'},{key:'fair_value_gap',title:'🔲 Fair Value Gap'},{key:'inducement',title:'🪤 Inducement'}],
+  psychology:[{key:'fomo',title:'😰 FOMO'},{key:'revenge',title:'😤 Revenge Trading'},{key:'discipline',title:'🎯 Дисципліна'},{key:'emotions',title:'❤️ Контроль емоцій'},{key:'journal_habit',title:'📓 Звичка вести журнал'}],
+};
+// Short summaries for webapp (full text in education.py)
+const LEARN_CONTENT={
+  pin_bar:{title:'📍 Пін-бар',text:`<b>Пін-бар</b> — свічка з довгою тінню та маленьким тілом.\n\n🟢 <b>Бичачий</b>: довга НИЖНЯ тінь — ведмеді штовхали вниз, бики відштовхнули → BUY\n🔴 <b>Ведмежий</b>: довга ВЕРХНЯ тінь — бики штовхали вгору, ведмеді відштовхнули → SELL\n\n<b>Правила:</b>\n• Тінь ≥ 60% від загальної довжини свічки\n• Тіло ≤ 35%\n• Обов'язково від ключового рівня\n• Вхід після закриття сигнальної свічки\n\n<b>SL:</b> за тінь + 3-5 пунктів\n<b>TP:</b> наступний рівень (RR ≥ 1:2)\n\n⭐⭐⭐⭐⭐ Ефективність`,img:'pin+bar+candlestick+trading+chart'},
+  engulfing:{title:'🟢🔴 Поглинання',text:`<b>Поглинання</b> — 2 свічки, де друга повністю "поглинає" першу.\n\n🟢 <b>Бичаче (BUY)</b>: червона → зелена більша\n🔴 <b>Ведмеже (SELL)</b>: зелена → червона більша\n\n<b>Умови:</b>\n• Друга свічка ≥ 1.05× від першої\n• На ключовому рівні\n• Вхід: закриття другої свічки\n\n⭐⭐⭐⭐`,img:'engulfing+candlestick+bullish+bearish'},
+  doji:{title:'➕ Доджі',text:`<b>Доджі</b> — відкриття ≈ закриття. Тіло майже 0.\nОзначає нерішучість ринку.\n\n<b>Типи:</b>\n➕ Класичний · 🕊 Dragonfly · 🪦 Gravestone · Long-legged\n\n<b>Важливо:</b> Доджі — це лише попередження! Потрібне підтвердження наступною свічкою.\n\n✅ Сильний після тривалого тренду або на ключовому рівні.\n\n⭐⭐⭐`,img:'doji+candlestick+types+forex'},
+  morning_star:{title:'⭐ Ранкова/Вечірня зірка',text:`<b>Ранкова зірка (BUY)</b> — 3 свічки:\n1️⃣ Велика ведмежа\n2️⃣ Маленька (доджі)\n3️⃣ Велика бичача (>50% першої)\n\n<b>Вечірня зірка (SELL)</b> — протилежно на вершині.\n\n<b>Підсилюють:</b> на важливому рівні + підвищений обсяг на 3-й свічці\n\n⭐⭐⭐⭐⭐`,img:'morning+star+evening+star+candlestick'},
+  hammer:{title:'🔨 Молот і Падаюча зірка',text:`<b>Молот (BUY)</b>: після падіння, мале тіло вгорі, довга нижня тінь ≥ 2× тіла\n<b>Shooting Star (SELL)</b>: після зростання, довга верхня тінь\n<b>Інвертований молот</b>: довга верхня тінь після падіння → потрібне підтвердження\n\n<b>Правило:</b> мінімум 3 попередні свічки в напрямку тренду!\n\n⭐⭐⭐⭐`,img:'hammer+shooting+star+candlestick'},
+  three_soldiers:{title:'🟢🟢🟢 Три солдати/ворони',text:`<b>Три білих солдати (BUY)</b>:\n3 зелені свічки, кожна вище попередньої, всі з великими тілами (≥50%)\n→ Сильний momentum покупців\n\n<b>Три чорних ворони (SELL)</b>:\n3 червоні свічки, кожна нижче попередньої\n\n✅ Після флету або корекції · ✅ На пробої рівня\n❌ Після вже великого руху\n\n⭐⭐⭐⭐⭐`,img:'three+white+soldiers+three+black+crows'},
+  inside_bar:{title:'📦 Inside Bar',text:`<b>Inside Bar</b> — свічка повністю "всередині" попередньої.\nРинок "стискається" перед великим рухом.\n\n<b>Стратегія:</b>\n• BUY: ціна пробиває HIGH мати-свічки вгору\n• SELL: ціна пробиває LOW мати-свічки вниз\n• SL: за протилежну сторону мати\n\n✅ Сильніший на H4/D1\n\n⭐⭐⭐`,img:'inside+bar+trading+breakout'},
+  tweezer:{title:'🔧 Пінцет (Tweezer)',text:`<b>Пінцет знизу (BUY)</b>: 2 свічки з однаковим мінімумом, перша ведмежа, друга бичача → двічі відбились від підтримки\n\n<b>Пінцет зверху (SELL)</b>: однакові максимуми → двічі відбились від опору\n\n✅ На важливому рівні · ✅ Один із пінів — доджі\n\n⭐⭐⭐⭐`,img:'tweezer+top+bottom+candlestick'},
+  s1_level_bounce:{title:'1️⃣ Відбій від рівня',text:`<b>Суть:</b> Ціна підходить до рівня підтримки/опору і відбивається.\n\n<b>5 кроків входу:</b>\n1️⃣ D1/H4: знайти рівень (3+ дотики)\n2️⃣ Чекати коли ціна прийде до рівня\n3️⃣ H1: паттерн підтвердження (пін-бар, поглинання)\n4️⃣ M15: уточнити вхід\n5️⃣ SL за рівень, TP ≥ RR 1:2\n\n✅ ADX < 25 · ✅ RSI перепроданий\n\n⭐⭐⭐⭐⭐`,img:'support+resistance+bounce+trading'},
+  s2_breakout:{title:'2️⃣ Пробій + ретест',text:`<b>Суть:</b> Пробиття рівня → ретест → продовження руху.\n\n<b>Алгоритм:</b>\n1️⃣ Сильний рівень на H4\n2️⃣ Закриття свічки ВИЩЕ рівня (пробій!)\n3️⃣ Чекати ретест\n4️⃣ Паттерн на H1 від рівня\n5️⃣ SL за рівень\n\n✅ Обсяг вище середнього · ✅ ADX зростає\n\n⭐⭐⭐⭐`,img:'breakout+retest+support+resistance'},
+  s3_pullback:{title:'3️⃣ Тренд + корекція',text:`<b>Суть:</b> Вхід на відкаті до EMA або Fibonacci.\n\n<b>Зони входу (пріоритет):</b>\n1. Golden Zone Fib 50-61.8% + EMA 21\n2. EMA 50 (38.2% Fibo)\n3. Попередній рівень (тепер підтримка)\n\n<b>Алгоритм:</b>\n1️⃣ ADX > 25 (сильний тренд)\n2️⃣ Чекати корекцію до зони\n3️⃣ Паттерн підтвердження\n4️⃣ SL нижче зони · TP ≥ RR 1:2\n\n⭐⭐⭐⭐⭐`,img:'trend+pullback+EMA+fibonacci'},
+  s4_range:{title:'4️⃣ Діапазонна торгівля',text:`<b>Суть:</b> Купуємо знизу, продаємо зверху діапазону.\n\n<b>Умови:</b>\n• ADX < 20 · 3+ відбиття від меж\n• Ширина ≥ 40-50 пунктів\n\n<b>Вхід:</b>\n• BUY: ціна в нижніх 20% + бичачий паттерн\n• SELL: ціна у верхніх 20% + ведмежий паттерн\n• SL: за межею + 10 пунктів\n• TP: протилежна межа\n\n⚠️ При пробої — закрити позицію!\n\n⭐⭐⭐`,img:'range+trading+support+resistance'},
+  s5_ema:{title:'5️⃣ EMA Crossover',text:`<b>Сигнали:</b>\n🟢 EMA 21 перетинає EMA 50 знизу вгору → BUY\n🔴 EMA 21 перетинає EMA 50 зверху вниз → SELL\n\n<b>Фільтри:</b>\n• Закрита свічка після перетину\n• MACD в тому ж напрямку\n• ADX > 20\n\n<b>Вхід:</b> перший відкат до EMA 21 після перетину + паттерн\n\n✅ H1, H4, D1\n\n⭐⭐⭐⭐`,img:'EMA+crossover+21+50+trading'},
+  support_resistance:{title:'📐 Підтримка та опір',text:`<b>Підтримка:</b> рівень де покупці сильніші → ціна відбивається вгору\n<b>Опір:</b> рівень де продавці сильніші → ціна відбивається вниз\n\n<b>Сильний рівень:</b>\n✅ 3+ дотики · ✅ Круглі числа · ✅ Великий обсяг\n\n<b>Правило конвертації:</b>\nПісля пробою → опір стає підтримкою!\n\n<b>Зони vs Рівні:</b>\nМалюйте ЗОНУ (5-10 пунктів), не тонку лінію`,img:'support+resistance+levels+zones'},
+  trend_structure:{title:'📈 Структура тренду',text:`🟢 <b>Uptrend:</b> HH (вищі хаї) + HL (вищі лоу)\n🔴 <b>Downtrend:</b> LH (нижчі хаї) + LL (нижчі лоу)\n\n<b>BOS (Break of Structure):</b>\nПробій останнього swing high/low = підтвердження тренду\n\n<b>CHoCH (Change of Character):</b>\nПерший пробій проти тренду = сигнал розвороту\n\n❗ Ніколи не торгуйте проти структури ринку!`,img:'market+structure+higher+high+lower+low'},
+  risk_management:{title:'⚠️ Управління ризиками',text:`<b>Золоте правило:</b> ризик ≤ 1-2% депозиту!\n\n<b>Формула лоту:</b>\nЛот = (Депозит × % ризику) ÷ (SL пунктів × вартість пункту)\n\n<b>RR мінімум 1:2</b> (40% прибуткових = профіт!)\n\n<b>Стопи:</b>\n• Breakeven: при 1R → SL в нуль\n• Trailing: при 2R → тягнути SL\n\n<b>Ліміти:</b>\n• День: -5% → зупинитись\n• Тиждень: -10% → пауза 2-3 дні`,img:'risk+management+position+sizing+forex'},
+  timeframes:{title:'⏱ Таймфрейми (MTF)',text:`<b>Принцип "Зверху вниз":</b>\n\n🗺 <b>Старший (D1/W1):</b> визначити тренд\n📈 <b>Робочий (H4/H1):</b> знайти сигнал\n⚡ <b>Вхідний (M30/M15):</b> уточнити точку входу\n\n<b>MTF Confluence:</b>\n✅✅✅ Всі 3 збігаються = дуже сильний\n✅✅❌ 2/3 = хороший\n✅❌❌ 1/3 = не торгувати`,img:'multiple+timeframe+analysis+trading'},
+  fibonacci:{title:'🌀 Fibonacci',text:`<b>Golden Zone: 50-61.8%</b> = найкраща зона входу!\n\n<b>Рівні:</b>\n🌟 61.8% — Золотий рівень\n⭐ 50.0% — Психологічний\n📍 38.2% — Мілка корекція\n\n<b>Як будувати:</b>\n• Uptrend: від LOW до HIGH\n• Downtrend: від HIGH до LOW\n\n<b>Вхід:</b> корекція в Golden Zone + паттерн підтвердження\n<b>SL:</b> нижче 78.6%\n\n⭐⭐⭐⭐⭐`,img:'fibonacci+retracement+golden+zone+trading'},
+  volume:{title:'📊 Аналіз обсягу',text:`<b>Правила:</b>\n✅ Ріст + великий обсяг = сильний бичачий рух\n✅ Падіння + великий обсяг = сильний ведмежий рух\n⚠️ Ріст + малий обсяг = можливий розворот\n\n<b>Volume Profile:</b>\n📍 POC = рівень максимального обсягу (магніт!)\n🔼 VAH = верхня межа зони вартості\n🔽 VAL = нижня межа зони вартості`,img:'volume+profile+POC+trading'},
+  bos_choch:{title:'💥 BOS та CHoCH',text:`<b>BOS (Break of Structure):</b>\nПробій останнього swing high → bullish BOS → шукаємо BUY на відкаті\nПробій swing low → bearish BOS → шукаємо SELL\n\n<b>CHoCH (Change of Character):</b>\nПерший пробій ПРОТИ тренду → попередження розвороту\n\n✅ BOS = продовжуємо в напрямку тренду\n⚠️ CHoCH = зменшуємо ризик\n❌ 2× CHoCH = можливий розворот`,img:'break+of+structure+BOS+CHOCH+smart+money'},
+  liquidity:{title:'💧 Зони ліквідності',text:`<b>Що це?</b> Місця де накопичились стоп-лоси інших трейдерів.\n\n<b>Де знаходиться:</b>\n• Над swing highs · Під swing lows\n• Equal Highs/Lows · Круглі числа\n\n<b>Liquidity Sweep:</b>\nЦіна виходить за рівень, збирає стопи, РІЗКО повертається!\n\n🟢 Sweep знизу → BUY сигнал (найсильніший!)\n🔴 Sweep зверху → SELL сигнал\n\n⭐⭐⭐⭐⭐`,img:'liquidity+sweep+smart+money+stop+hunt'},
+  order_blocks:{title:'📦 Order Blocks',text:`<b>Order Block</b> = остання свічка перед сильним імпульсом.\n\n🟢 <b>Bullish OB:</b> остання ведмежа свічка → при поверненні BUY\n🔴 <b>Bearish OB:</b> остання бичача свічка → при поверненні SELL\n\n<b>Торгівля:</b>\n1️⃣ Знайти OB після імпульсу\n2️⃣ Чекати повернення ціни\n3️⃣ Паттерн підтвердження\n4️⃣ SL за OB · TP ≥ RR 1:2\n\n⭐⭐⭐⭐⭐`,img:'order+block+smart+money+institutional'},
+  fair_value_gap:{title:'🔲 Fair Value Gap (FVG)',text:`<b>FVG</b> = незаповнений розрив між тінями 3 свічок.\n\n🟢 Bullish FVG: Low №3 > High №1 → BUY при поверненні\n🔴 Bearish FVG: High №3 < Low №1 → SELL при поверненні\n\n<b>Чому ціна повертається?</b>\n80% FVG заповнюються! Ринок "балансує" незаповнені зони.\n\n<b>Вхід:</b> повернення в FVG + паттерн підтвердження\n\n⭐⭐⭐⭐`,img:'fair+value+gap+FVG+imbalance'},
+  inducement:{title:'🪤 Inducement (Пастка)',text:`<b>Inducement</b> = штучний рух щоб заманити роздрібних трейдерів.\n\n<b>Класика:</b>\n1️⃣ Ринок росте → всі купують\n2️⃣ Маленький відкат (Inducement!)\n3️⃣ Роздрібні продають зі збитком\n4️⃣ Smart Money купили → ціна продовжує рости\n\n🔥 <b>Inducement + Liquidity Sweep = НАЙСИЛЬНІШИЙ сигнал!</b>`,img:'inducement+smart+money+liquidity+trap'},
+  fomo:{title:'😰 FOMO',text:`<b>FOMO</b> = "Страх пропустити рух".\n\n<b>Симптоми:</b> входите після великого руху · без аналізу · "ціна ж іде!"\n\n<b>Небезпека:</b> ви купуєте на хаях → Smart Money продають вам → розворот\n\n<b>Лікування:</b>\n✅ "Пропустив → наступна краща"\n✅ Торгуйте тільки по чеклисту\n✅ Ринок відкритий 24/7`,img:'FOMO+trading+psychology+fear'},
+  revenge:{title:'😤 Revenge Trading',text:`<b>Revenge Trading</b> = відкриття угоди після збитку щоб "відіграти".\n\n<b>Результат:</b> 80% трейдерів що займаються цим — зливають депозит за день\n\n<b>Правила:</b>\n• 3 збитки поспіль → зупинись на сьогодні\n• Великий збиток → не торгуй 24 години\n• Закрий платформу фізично`,img:'revenge+trading+psychology+loss'},
+  discipline:{title:'🎯 Дисципліна',text:`<b>90% трейдерів губляться не через стратегію — через відсутність дисципліни!</b>\n\n<b>5-кроковий чеклист перед входом:</b>\n□ Тренд підтверджує?\n□ Є ключовий рівень?\n□ Є паттерн підтвердження?\n□ SL і TP з RR ≥ 1:2?\n□ Я спокійний і тверезо мислю?\n\n❗ Якщо хоч одне "Ні" → не входити`,img:'trading+discipline+consistency+psychology'},
+  emotions:{title:'❤️ Контроль емоцій',text:`<b>2 ворога:</b>\n😱 СТРАХ — не дає відкривати хороші угоди\n🤑 ЖАДІБНІСТЬ — змушує ризикувати більше\n\n<b>Техніки контролю:</b>\n• Правило 5 хвилин: зачекайте перед входом\n• Правило екрану: після відкриття — закрийте платформу на 1 год\n• Торгуйте тільки у спокійному стані\n• Записуйте емоції в журнал`,img:'trading+emotions+fear+greed+psychology'},
+  journal_habit:{title:'📓 Звичка вести журнал',text:`<b>Що записувати:</b>\n□ Дата, пара, напрямок\n□ Причина входу (1-2 речення)\n□ SL і TP, RR\n□ Скріншот до і після\n□ Результат в $ і RR\n□ Що зроблено правильно / помилки\n\n<b>Щотижні:</b> аналіз Win Rate, середнього RR, найчастіших помилок\n\n<b>Після 100 записів</b> → ви торгуєте на 80% краще`,img:'trading+journal+performance+tracking'},
+};
+
+function renderLearnHome(){
+  document.getElementById('learnHome').innerHTML=LEARN_CATS.map(c=>`
+    <div class="learn-cat" onclick="showLearnCat('${c.key}')">
+      <div><div class="learn-cat-title">${c.icon} ${c.title}</div><div class="small text-muted">${c.desc}</div></div>
+      <div class="text-muted">›</div>
+    </div>`).join('');
+  document.getElementById('learnCat').classList.add('hidden');
+  document.getElementById('learnTopic').classList.add('hidden');
+  document.getElementById('learnHome').classList.remove('hidden');
+}
+function showLearnCat(cat){
+  const topics=LEARN_TOPICS[cat]||[];
+  const catData=LEARN_CATS.find(c=>c.key===cat);
+  document.getElementById('learnCat').innerHTML=`
+    <button class="btn-sm mb-4" onclick="renderLearnHome()">◀️ Назад</button>
+    <div class="section-title">${catData?.icon} ${catData?.title}</div>
+    ${topics.map(t=>`<div class="learn-topic" onclick="showLearnTopic('${t.key}','${cat}')"><div class="learn-topic-title">${t.title}</div></div>`).join('')}`;
+  document.getElementById('learnHome').classList.add('hidden');
+  document.getElementById('learnCat').classList.remove('hidden');
+  document.getElementById('learnTopic').classList.add('hidden');
+}
+function showLearnTopic(key,cat){
+  const l=LEARN_CONTENT[key];
+  if(!l)return;
+  const imgUrl=l.img?`https://source.unsplash.com/800x400/?${l.img.replace(/\+/g,',')}`:null;
+  document.getElementById('learnTopic').innerHTML=`
+    <button class="btn-sm mb-4" onclick="showLearnCat('${cat}')">◀️ Назад</button>
+    ${imgUrl?`<img class="learn-img" src="${imgUrl}" alt="${l.title}" onerror="this.style.display='none'">`:''}
+    <div class="section-title">${l.title}</div>
+    <div class="learn-content">${(l.text||'').replace(/\n/g,'<br>').replace(/\*\*(.*?)\*\*/g,'<b>$1</b>')}</div>`;
+  document.getElementById('learnHome').classList.add('hidden');
+  document.getElementById('learnCat').classList.add('hidden');
+  document.getElementById('learnTopic').classList.remove('hidden');
+}
+
+// ═══════════════════════════════════════════════════════════
+//  TOAST & INIT
+// ═══════════════════════════════════════════════════════════
+function showToast(msg){const t=document.getElementById('toast');t.textContent=msg;t.classList.add('show');setTimeout(()=>t.classList.remove('show'),2500);}
+
+renderPairs();loadChart();calcR();buildRiskTable();renderJournal();renderLearnHome();
+if(tg)tg.BackButton.onClick(()=>{showPage('analysis');tg.BackButton.hide();});
+</script>
+</body>
+</html>
